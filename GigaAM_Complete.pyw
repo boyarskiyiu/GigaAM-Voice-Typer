@@ -1,13 +1,12 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-GigaAM Complete — Версия 1.7.9 (15.04.2026)
+GigaAM Complete — Версия 1.8.1 (15.04.2026)
 (c) Боярский Игорь Юрьевич, 2026
 
-- Восстановлены крупные шрифты в шапке
-- Кнопки шириной 16, шрифт 10pt – текст влезает идеально
-- В "О программе" добавлены контакты
-- Исправлен диалог исправления, убраны подвисания
+- Полностью унифицированы шрифты: всё крупно и читаемо
+- Кнопки единой ширины 17, шрифт 10pt bold
+- Оптимизирована геометрия и скорость работы
 """
 
 import sys
@@ -40,7 +39,7 @@ os.environ["ORT_DISABLE_DML"] = "1"
 os.environ["ORT_DISABLE_OPENVINO"] = "1"
 os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
 
-CURRENT_VERSION = "1.7.9"
+CURRENT_VERSION = "1.8.1"
 GITHUB_REPO = "boyarskiyiu/GigaAM-Voice-Typer"
 
 # ----------------------------------------------------------------------
@@ -153,7 +152,7 @@ def get_best_mic():
 # ----------------------------------------------------------------------
 # ЗАЩИТА ОТ ПОВТОРНЫХ ЗАПУСКОВ
 # ----------------------------------------------------------------------
-lock_file = os.path.join(tempfile.gettempdir(), "gigaam_179.lock")
+lock_file = os.path.join(tempfile.gettempdir(), "gigaam_181.lock")
 def is_process_running(pid):
     try:
         output = subprocess.check_output(f'tasklist /FI "PID eq {pid}"', shell=True, encoding='cp866')
@@ -291,7 +290,7 @@ class GigaAMApp:
         threading.Thread(target=worker, daemon=True).start()
 
     def create_widgets(self):
-        # Шапка (высота 190) – восстановлены крупные шрифты
+        # Шапка (высота 190) – шрифты крупные
         header_frame = tk.Frame(self.root, bg="#f0f0f0", highlightthickness=2, highlightbackground="black")
         header_frame.pack(fill=tk.X, padx=6, pady=4)
         header = tk.Frame(header_frame, bg="#2c3e50", height=190, relief=tk.RAISED, borderwidth=3)
@@ -301,12 +300,12 @@ class GigaAMApp:
         left = tk.Frame(header, bg="#2c3e50")
         left.place(relx=0, rely=0, relwidth=0.68, relheight=1)
 
-        tk.Label(left, text="🎤 GigaAM Complete", font=("Segoe UI", 17, "bold"),
+        tk.Label(left, text="🎤 GigaAM Complete", font=("Segoe UI", 18, "bold"),
                  bg="#2c3e50", fg="white").place(x=6, y=6)
         tk.Label(left, text=f"Версия {CURRENT_VERSION} (15.04.2026)", font=("Segoe UI", 10),
-                 bg="#2c3e50", fg="#bdc3c7").place(x=6, y=36)
-        tk.Label(left, text="Разработчик: Боярский Игорь Юрьевич", font=("Segoe UI", 13, "bold"),
-                 bg="#2c3e50", fg="#f1c40f").place(x=6, y=60)
+                 bg="#2c3e50", fg="#bdc3c7").place(x=6, y=38)
+        tk.Label(left, text="Разработчик: Боярский Игорь Юрьевич", font=("Segoe UI", 14, "bold"),
+                 bg="#2c3e50", fg="#f1c40f").place(x=6, y=62)
 
         desc_text = (
             "Голос → текст с вставкой в активное окно. Модель GigaAM-v3.\n"
@@ -314,12 +313,12 @@ class GigaAMApp:
             "• Яндекс.Спеллер исправляет опечатки и повторы.\n"
             "F2 — пауза, F3 — исправить, F4 — свернуть."
         )
-        tk.Label(left, text=desc_text, font=("Segoe UI", 9), bg="#2c3e50", fg="#c0d0e0",
-                 justify=tk.LEFT).place(x=6, y=90)
+        tk.Label(left, text=desc_text, font=("Segoe UI", 10), bg="#2c3e50", fg="#c0d0e0",
+                 justify=tk.LEFT).place(x=6, y=94)
 
         mic_desc = "Микрофон: автоматический выбор. Автокалибровка."
-        tk.Label(left, text=mic_desc, font=("Segoe UI", 9), bg="#2c3e50", fg="#bdc3c7",
-                 justify=tk.LEFT).place(x=6, y=154)
+        tk.Label(left, text=mic_desc, font=("Segoe UI", 10), bg="#2c3e50", fg="#bdc3c7",
+                 justify=tk.LEFT).place(x=6, y=156)
 
         right = tk.Frame(header, bg="#2c3e50")
         right.place(relx=0.68, rely=0, relwidth=0.32, relheight=1)
@@ -364,11 +363,11 @@ class GigaAMApp:
                                    relief=tk.SUNKEN, borderwidth=2)
         self.phrase_text.pack(fill=tk.BOTH, expand=True, padx=4, pady=4)
 
-        # Кнопки – ширина 16, шрифт 10pt bold
+        # Кнопки – единая ширина 17, шрифт 10pt bold
         btn_frame = tk.Frame(self.root, bg="#f0f0f0")
         btn_frame.pack(fill=tk.X, padx=6, pady=5)
 
-        btn_width = 16
+        btn_width = 17
         def on_enter(btn, color_on): btn.config(bg=color_on)
         def on_leave(btn, color_off): btn.config(bg=color_off)
 
@@ -557,11 +556,11 @@ class GigaAMApp:
             return
         dialog = tk.Toplevel(self.root)
         dialog.title("Исправление фразы")
-        dialog.geometry("540x170")
+        dialog.geometry("560x180")
         dialog.configure(bg="#f0f0f0")
         dialog.transient(self.root)
-        x = self.root.winfo_x() + (self.root.winfo_width() - 540) // 2
-        y = self.root.winfo_y() + (self.root.winfo_height() - 170) // 2
+        x = self.root.winfo_x() + (self.root.winfo_width() - 560) // 2
+        y = self.root.winfo_y() + (self.root.winfo_height() - 180) // 2
         dialog.geometry(f"+{x}+{y}")
         tk.Label(dialog, text="Неправильно:", bg="#f0f0f0", font=("Segoe UI", 11)).pack(pady=(10,0))
         wrong_entry = tk.Entry(dialog, width=55, font=("Segoe UI", 11))
@@ -572,7 +571,7 @@ class GigaAMApp:
         correct_entry = tk.Entry(dialog, width=55, font=("Segoe UI", 11))
         correct_entry.pack(pady=5)
         btn_save = tk.Button(dialog, text="Сохранить", command=lambda: self._save_fix(dialog, correct_entry.get().strip()),
-                             bg="#4caf50", fg="white", width=16, font=("Segoe UI", 10, "bold"))
+                             bg="#4caf50", fg="white", width=17, font=("Segoe UI", 10, "bold"))
         btn_save.pack(pady=10)
 
     def _save_fix(self, dialog, corr):
