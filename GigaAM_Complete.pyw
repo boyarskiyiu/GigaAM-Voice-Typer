@@ -1,13 +1,11 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-GigaAM Complete — Компактная версия 1.6.0 (15.04.2026)
+GigaAM Complete — Версия 1.7.2 (15.04.2026)
 (c) Боярский Игорь Юрьевич, 2026
 
-- Компактный интерфейс (820x690)
-- Ускоренный VAD (пауза 0.7 сек)
-- Очередь распознавания 5 (без потерь при быстрой речи)
-- Яндекс.Спеллер, автоустановка, проверка обновлений
+- Окно сужено до 760px, исправлено наложение в шапке
+- Автоматическое обновление с GitHub
 """
 
 import sys
@@ -40,8 +38,8 @@ os.environ["ORT_DISABLE_DML"] = "1"
 os.environ["ORT_DISABLE_OPENVINO"] = "1"
 os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
 
-CURRENT_VERSION = "1.6.0"
-GITHUB_REPO = "boyarskiyiu/GigaAM-Voice-Typer"   # замените на свой логин, если другой
+CURRENT_VERSION = "1.7.2"
+GITHUB_REPO = "boyarskiyiu/GigaAM-Voice-Typer"
 
 # ----------------------------------------------------------------------
 # АВТОУСТАНОВКА ВСЕХ ЗАВИСИМОСТЕЙ (тихая)
@@ -153,7 +151,7 @@ def get_best_mic():
 # ----------------------------------------------------------------------
 # ЗАЩИТА ОТ ПОВТОРНЫХ ЗАПУСКОВ
 # ----------------------------------------------------------------------
-lock_file = os.path.join(tempfile.gettempdir(), "gigaam_160.lock")
+lock_file = os.path.join(tempfile.gettempdir(), "gigaam_172.lock")
 def is_process_running(pid):
     try:
         output = subprocess.check_output(f'tasklist /FI "PID eq {pid}"', shell=True, encoding='cp866')
@@ -228,7 +226,7 @@ class GigaAMApp:
     def __init__(self, root):
         self.root = root
         self.root.title("GigaAM Complete — Голосовой ввод")
-        self.root.geometry("820x690")        # компактное окно
+        self.root.geometry("760x690")        # Ещё уже
         self.root.configure(bg="#f0f0f0")
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
 
@@ -242,7 +240,7 @@ class GigaAMApp:
         self.listening = True
         self.rate = 16000
         self.blocksize = 1024
-        self.silence_dur = 0.7          # быстрее отправка
+        self.silence_dur = 0.7
         self.min_speech_frames = 4
         self.threshold = 550
         self.device = None
@@ -268,7 +266,7 @@ class GigaAMApp:
         self.pre_max = int(0.7 * self.rate / self.blocksize)
 
         self.running = True
-        self.task_queue = queue.Queue(maxsize=5)   # увеличенная очередь
+        self.task_queue = queue.Queue(maxsize=5)
         self.start_worker()
 
         self.volume_indicator = None
@@ -291,21 +289,21 @@ class GigaAMApp:
         threading.Thread(target=worker, daemon=True).start()
 
     def create_widgets(self):
-        # Шапка (компактная, высота 170)
+        # Шапка (высота 170)
         header_frame = tk.Frame(self.root, bg="#f0f0f0", highlightthickness=2, highlightbackground="black")
-        header_frame.pack(fill=tk.X, padx=6, pady=3)
+        header_frame.pack(fill=tk.X, padx=5, pady=3)
         header = tk.Frame(header_frame, bg="#2c3e50", height=170, relief=tk.RAISED, borderwidth=3)
         header.pack(fill=tk.X, padx=0, pady=0)
         header.pack_propagate(False)
 
         left = tk.Frame(header, bg="#2c3e50")
         left.place(relx=0, rely=0, relwidth=0.68, relheight=1)
-        tk.Label(left, text="🎤 GigaAM Complete", font=("Segoe UI", 15, "bold"),
-                 bg="#2c3e50", fg="white").place(x=6, y=5)
+        tk.Label(left, text="🎤 GigaAM Complete", font=("Segoe UI", 14, "bold"),
+                 bg="#2c3e50", fg="white").place(x=5, y=5)
         tk.Label(left, text=f"Версия {CURRENT_VERSION} (15.04.2026)", font=("Segoe UI", 8),
-                 bg="#2c3e50", fg="#bdc3c7").place(x=6, y=32)
-        tk.Label(left, text="Разработчик: Боярский Игорь Юрьевич", font=("Segoe UI", 11, "bold"),
-                 bg="#2c3e50", fg="#f1c40f").place(x=6, y=54)
+                 bg="#2c3e50", fg="#bdc3c7").place(x=5, y=32)
+        tk.Label(left, text="Разработчик: Боярский Игорь Юрьевич", font=("Segoe UI", 10, "bold"),
+                 bg="#2c3e50", fg="#f1c40f").place(x=5, y=52)
 
         desc_text = (
             "Голос → текст с вставкой в активное окно. Модель GigaAM-v3.\n"
@@ -314,24 +312,25 @@ class GigaAMApp:
             "F2 — пауза, F3 — исправить, F4 — свернуть."
         )
         tk.Label(left, text=desc_text, font=("Segoe UI", 8), bg="#2c3e50", fg="#c0d0e0",
-                 justify=tk.LEFT).place(x=6, y=82)
+                 justify=tk.LEFT).place(x=5, y=80)
 
+        # Опускаем ещё ниже
         mic_desc = "Микрофон: автоматический выбор. Автокалибровка."
         tk.Label(left, text=mic_desc, font=("Segoe UI", 8), bg="#2c3e50", fg="#bdc3c7",
-                 justify=tk.LEFT).place(x=6, y=136)
+                 justify=tk.LEFT).place(x=5, y=145)
 
         right = tk.Frame(header, bg="#2c3e50")
         right.place(relx=0.68, rely=0, relwidth=0.32, relheight=1)
-        tk.Label(right, text="📞 +7 905 570-28-04", font=("Segoe UI", 10),
+        tk.Label(right, text="📞 +7 905 570-28-04", font=("Segoe UI", 9),
                  bg="#2c3e50", fg="#ecf0f1").place(relx=0.98, y=8, anchor="ne")
-        tk.Label(right, text="✉️ boyarskiyiu@yandex.ru", font=("Segoe UI", 10),
-                 bg="#2c3e50", fg="#ecf0f1").place(relx=0.98, y=36, anchor="ne")
+        tk.Label(right, text="✉️ boyarskiyiu@yandex.ru", font=("Segoe UI", 9),
+                 bg="#2c3e50", fg="#ecf0f1").place(relx=0.98, y=34, anchor="ne")
         tk.Label(right, text="© 2026 Боярский И.Ю.\nВсе права защищены.",
-                 font=("Segoe UI", 9), bg="#2c3e50", fg="#bdc3c7", justify=tk.RIGHT).place(relx=0.98, y=70, anchor="ne")
+                 font=("Segoe UI", 8), bg="#2c3e50", fg="#bdc3c7", justify=tk.RIGHT).place(relx=0.98, y=66, anchor="ne")
 
         # Статусная строка
         status_frame = tk.Frame(self.root, bg="#f0f0f0")
-        status_frame.pack(fill=tk.X, padx=6, pady=3)
+        status_frame.pack(fill=tk.X, padx=5, pady=3)
         self.status_label = tk.Label(status_frame, text="⏳ Инициализация...", font=("Segoe UI", 10, "bold"), bg="#f0f0f0")
         self.status_label.pack(side=tk.LEFT)
 
@@ -339,16 +338,16 @@ class GigaAMApp:
         vol_frame.pack(side=tk.RIGHT)
         self.volume_label = tk.Label(vol_frame, text="0%", font=("Segoe UI", 8), bg="#f0f0f0", width=4)
         self.volume_label.pack(side=tk.RIGHT, padx=(4,0))
-        self.volume_indicator = ttk.Progressbar(vol_frame, mode='determinate', length=80, maximum=100)
+        self.volume_indicator = ttk.Progressbar(vol_frame, mode='determinate', length=70, maximum=100)
         self.volume_indicator.pack(side=tk.RIGHT)
 
         self.listening_label = tk.Label(status_frame, text="● СЛУШАЮ", font=("Segoe UI", 10, "bold"),
                                         bg="#f0f0f0", fg="#2e7d32")
         self.listening_label.pack(side=tk.RIGHT, padx=(0,8))
 
-        # Лог (компактный)
+        # Лог
         log_frame = tk.LabelFrame(self.root, text="Лог работы", bg="#f0f0f0", font=("Segoe UI", 9))
-        log_frame.pack(fill=tk.BOTH, expand=True, padx=6, pady=3)
+        log_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=3)
         accent_canvas = tk.Canvas(log_frame, width=3, bg="#f1c40f", highlightthickness=0)
         accent_canvas.pack(side=tk.LEFT, fill=tk.Y)
         self.log_text = scrolledtext.ScrolledText(log_frame, wrap=tk.WORD, height=10,
@@ -357,15 +356,15 @@ class GigaAMApp:
 
         # Последняя фраза
         phrase_frame = tk.LabelFrame(self.root, text="Последняя распознанная фраза", bg="#f0f0f0", font=("Segoe UI", 9))
-        phrase_frame.pack(fill=tk.X, padx=6, pady=3)
+        phrase_frame.pack(fill=tk.X, padx=5, pady=3)
         self.phrase_text = tk.Text(phrase_frame, height=2, wrap=tk.WORD,
                                    bg="#ffffff", fg="#000000", font=("Segoe UI", 10),
                                    relief=tk.SUNKEN, borderwidth=2)
         self.phrase_text.pack(fill=tk.BOTH, expand=True, padx=3, pady=3)
 
-        # Кнопки (компактные)
+        # Кнопки
         btn_frame = tk.Frame(self.root, bg="#f0f0f0")
-        btn_frame.pack(fill=tk.X, padx=6, pady=5)
+        btn_frame.pack(fill=tk.X, padx=5, pady=5)
 
         btn_width = 14
         def on_enter(btn, color_on): btn.config(bg=color_on)
@@ -397,7 +396,7 @@ class GigaAMApp:
         self.btn_update.pack(side=tk.LEFT, padx=2)
         self.btn_update.bind("<Enter>", lambda e: on_enter(self.btn_update, "#64b5f6"))
         self.btn_update.bind("<Leave>", lambda e: on_leave(self.btn_update, "#2196f3"))
-        ToolTip(self.btn_update, "Проверить наличие обновлений")
+        ToolTip(self.btn_update, "Проверить и установить обновления")
 
         self.btn_about = tk.Button(btn_frame, text="ℹ️ О программе", command=self.show_about,
                                    bg="#607d8b", fg="white", width=btn_width, font=("Segoe UI", 9, "bold"))
@@ -417,6 +416,12 @@ class GigaAMApp:
         keyboard.add_hotkey('F3', self.fix_last_phrase)
         keyboard.add_hotkey('F4', self.minimize_window)
 
+    # ... (остальные методы без изменений: compare_versions, download_and_install_update, check_updates,
+    #      show_about, log, set_status, toggle_listening, minimize_window, fix_last_phrase, _save_fix,
+    #      on_close, init_background, calibrate_threshold, start_stream, update_volume_color,
+    #      audio_callback, _recognize_and_paste, update_phrase, paste)
+
+    # Вставляю остальные методы для полноты
     def compare_versions(self, v1, v2):
         def normalize(v):
             return [int(x) for x in v.split('.')]
@@ -430,6 +435,39 @@ class GigaAMApp:
             if p1 < p2: return -1
         return 0
 
+    def download_and_install_update(self, download_url):
+        try:
+            self.log("⬇️ Скачивание обновления...")
+            response = requests.get(download_url, stream=True, timeout=30)
+            response.raise_for_status()
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".pyw") as tmp_file:
+                for chunk in response.iter_content(chunk_size=8192):
+                    tmp_file.write(chunk)
+                tmp_path = tmp_file.name
+            self.log(f"✅ Загружено: {os.path.basename(tmp_path)}")
+            if not messagebox.askyesno("Установка обновления",
+                                       "Новая версия загружена. Установить и перезапустить программу сейчас?"):
+                os.unlink(tmp_path)
+                return
+            current_path = os.path.abspath(sys.argv[0])
+            backup_path = current_path + ".backup"
+            if os.path.exists(backup_path):
+                os.remove(backup_path)
+            os.rename(current_path, backup_path)
+            shutil.copy2(tmp_path, current_path)
+            os.unlink(tmp_path)
+            self.log("✅ Обновление установлено. Перезапуск...")
+            self.running = False
+            if hasattr(self, 'stream') and self.stream:
+                self.stream.stop()
+                self.stream.close()
+            self.root.quit()
+            subprocess.Popen([sys.executable, current_path], creationflags=subprocess.CREATE_NO_WINDOW)
+            sys.exit(0)
+        except Exception as e:
+            self.log(f"❌ Ошибка установки обновления: {e}")
+            messagebox.showerror("Ошибка", f"Не удалось установить обновление:\n{e}")
+
     def check_updates(self):
         self.log("🔄 Проверка обновлений...")
         url = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
@@ -442,9 +480,23 @@ class GigaAMApp:
                 latest_version = latest_release["tag_name"].replace("v", "")
                 self.log(f"   GitHub: {latest_version}, текущая: {CURRENT_VERSION}")
                 if self.compare_versions(latest_version, CURRENT_VERSION) > 0:
+                    assets = latest_release.get("assets", [])
+                    download_url = None
+                    for asset in assets:
+                        if asset["name"].endswith(".pyw"):
+                            download_url = asset["browser_download_url"]
+                            break
+                    if not download_url:
+                        if messagebox.askyesno("Доступно обновление",
+                                               f"Найдена новая версия: {latest_version}.\n"
+                                               "Автоматическая установка невозможна (нет .pyw файла в релизе).\n"
+                                               "Открыть страницу для ручного скачивания?"):
+                            webbrowser.open(f"https://github.com/{GITHUB_REPO}/releases/latest")
+                        return
                     if messagebox.askyesno("Доступно обновление",
-                                           f"Найдена новая версия: {latest_version}.\nОткрыть страницу для скачивания?"):
-                        webbrowser.open(f"https://github.com/{GITHUB_REPO}/releases/latest")
+                                           f"Найдена новая версия: {latest_version}.\n"
+                                           "Скачать и установить автоматически?"):
+                        self.download_and_install_update(download_url)
                 else:
                     messagebox.showinfo("Обновлений нет", "У вас установлена последняя версия.")
                 return
@@ -465,7 +517,9 @@ class GigaAMApp:
             "• Распознавание GigaAM-v3\n"
             "• Яндекс.Спеллер\n"
             "• Автоустановка зависимостей\n"
-            "• Проверка обновлений через GitHub"
+            "• Автоматическое обновление\n\n"
+            "Репозиторий:\n"
+            f"https://github.com/{GITHUB_REPO}"
         )
         messagebox.showinfo("О программе", about_text)
 
