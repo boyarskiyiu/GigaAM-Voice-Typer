@@ -1,12 +1,12 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-GigaAM Complete — Версия 1.7.6 (15.04.2026)
+GigaAM Complete — Версия 1.7.7 (15.04.2026)
 (c) Боярский Игорь Юрьевич, 2026
 
-- Полностью переработана геометрия: ничего не налезает, всё компактно
-- Кнопки стали уже и аккуратнее
-- Мгновенный старт, автообновление
+- Увеличены шрифты в правой части шапки (контакты, копирайт)
+- Увеличена высота шапки до 190 для комфортного размещения
+- Оптимизирована геометрия, всё читаемо и красиво
 """
 
 import sys
@@ -39,7 +39,7 @@ os.environ["ORT_DISABLE_DML"] = "1"
 os.environ["ORT_DISABLE_OPENVINO"] = "1"
 os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
 
-CURRENT_VERSION = "1.7.6"
+CURRENT_VERSION = "1.7.7"
 GITHUB_REPO = "boyarskiyiu/GigaAM-Voice-Typer"
 
 # ----------------------------------------------------------------------
@@ -152,7 +152,7 @@ def get_best_mic():
 # ----------------------------------------------------------------------
 # ЗАЩИТА ОТ ПОВТОРНЫХ ЗАПУСКОВ
 # ----------------------------------------------------------------------
-lock_file = os.path.join(tempfile.gettempdir(), "gigaam_176.lock")
+lock_file = os.path.join(tempfile.gettempdir(), "gigaam_177.lock")
 def is_process_running(pid):
     try:
         output = subprocess.check_output(f'tasklist /FI "PID eq {pid}"', shell=True, encoding='cp866')
@@ -290,10 +290,10 @@ class GigaAMApp:
         threading.Thread(target=worker, daemon=True).start()
 
     def create_widgets(self):
-        # Шапка (высота 180) – переработаны координаты
+        # Шапка (высота 190) – увеличены шрифты в правой части
         header_frame = tk.Frame(self.root, bg="#f0f0f0", highlightthickness=2, highlightbackground="black")
         header_frame.pack(fill=tk.X, padx=6, pady=4)
-        header = tk.Frame(header_frame, bg="#2c3e50", height=180, relief=tk.RAISED, borderwidth=3)
+        header = tk.Frame(header_frame, bg="#2c3e50", height=190, relief=tk.RAISED, borderwidth=3)
         header.pack(fill=tk.X, padx=0, pady=0)
         header.pack_propagate(False)
 
@@ -310,7 +310,7 @@ class GigaAMApp:
         tk.Label(left, text="Разработчик: Боярский Игорь Юрьевич", font=("Segoe UI", 12, "bold"),
                  bg="#2c3e50", fg="#f1c40f").place(x=6, y=56)
 
-        # Описание (сдвинуто вниз)
+        # Описание
         desc_text = (
             "Голос → текст с вставкой в активное окно. Модель GigaAM-v3.\n"
             "• Автоустановка пакетов, модели, ffmpeg.\n"
@@ -323,17 +323,17 @@ class GigaAMApp:
         # Микрофон
         mic_desc = "Микрофон: автоматический выбор. Автокалибровка."
         tk.Label(left, text=mic_desc, font=("Segoe UI", 9), bg="#2c3e50", fg="#bdc3c7",
-                 justify=tk.LEFT).place(x=6, y=148)
+                 justify=tk.LEFT).place(x=6, y=152)
 
-        # Правая часть шапки
+        # Правая часть шапки (шрифты увеличены)
         right = tk.Frame(header, bg="#2c3e50")
         right.place(relx=0.68, rely=0, relwidth=0.32, relheight=1)
-        tk.Label(right, text="📞 +7 905 570-28-04", font=("Segoe UI", 10),
-                 bg="#2c3e50", fg="#ecf0f1").place(relx=0.98, y=10, anchor="ne")
-        tk.Label(right, text="✉️ boyarskiyiu@yandex.ru", font=("Segoe UI", 10),
-                 bg="#2c3e50", fg="#ecf0f1").place(relx=0.98, y=36, anchor="ne")
+        tk.Label(right, text="📞 +7 905 570-28-04", font=("Segoe UI", 11),
+                 bg="#2c3e50", fg="#ecf0f1").place(relx=0.98, y=12, anchor="ne")
+        tk.Label(right, text="✉️ boyarskiyiu@yandex.ru", font=("Segoe UI", 11),
+                 bg="#2c3e50", fg="#ecf0f1").place(relx=0.98, y=40, anchor="ne")
         tk.Label(right, text="© 2026 Боярский И.Ю.\nВсе права защищены.",
-                 font=("Segoe UI", 10), bg="#2c3e50", fg="#bdc3c7", justify=tk.RIGHT).place(relx=0.98, y=70, anchor="ne")
+                 font=("Segoe UI", 11, "bold"), bg="#2c3e50", fg="#f1c40f", justify=tk.RIGHT).place(relx=0.98, y=76, anchor="ne")
 
         # Статусная строка
         status_frame = tk.Frame(self.root, bg="#f0f0f0")
