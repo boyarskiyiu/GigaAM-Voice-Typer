@@ -1,12 +1,12 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-GigaAM Complete — Версия 2.0.1 (16.04.2026)
+GigaAM Complete — Версия 2.0.2 (16.04.2026)
 (c) Боярский Игорь Юрьевич, 2026
 
-- Возвращён классический яркий дизайн (тёмно-синяя шапка, цветные кнопки)
-- Сохранена исправленная геометрия на grid()
-- Автообновление, Яндекс.Спеллер, автоустановка зависимостей
+- Исправлены отступы и геометрия: шапка и кнопки растягиваются по ширине
+- Кнопки равномерно распределены, акцентная полоска в логе на месте
+- Крупные читаемые шрифты, автообновление, Яндекс.Спеллер
 """
 
 import sys
@@ -39,7 +39,7 @@ os.environ["ORT_DISABLE_DML"] = "1"
 os.environ["ORT_DISABLE_OPENVINO"] = "1"
 os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
 
-CURRENT_VERSION = "2.0.1"
+CURRENT_VERSION = "2.0.2"
 GITHUB_REPO = "boyarskiyiu/GigaAM-Voice-Typer"
 
 # ----------------------------------------------------------------------
@@ -150,7 +150,7 @@ def get_best_mic():
 # ----------------------------------------------------------------------
 # ЗАЩИТА ОТ ПОВТОРНЫХ ЗАПУСКОВ
 # ----------------------------------------------------------------------
-lock_file = os.path.join(tempfile.gettempdir(), "gigaam_201.lock")
+lock_file = os.path.join(tempfile.gettempdir(), "gigaam_202.lock")
 def is_process_running(pid):
     try:
         output = subprocess.check_output(f'tasklist /FI "PID eq {pid}"', shell=True, encoding='cp866')
@@ -225,12 +225,12 @@ class GigaAMApp:
     def __init__(self, root):
         self.root = root
         self.root.title("GigaAM Complete — Голосовой ввод")
-        self.root.geometry("780x760")
-        self.root.minsize(780, 760)
+        self.root.geometry("800x760")  # Чуть шире для кнопок
+        self.root.minsize(800, 760)
         self.root.configure(bg="#f0f0f0")
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
 
-        # Стандартная тема, но мы всё равно стилизуем Progressbar
+        # Стили для прогрессбара
         self.style = ttk.Style()
         self.style.theme_use('default')
         self.style.configure("green.Horizontal.TProgressbar", background="#2e7d32", troughcolor="#e0e0e0")
@@ -290,8 +290,8 @@ class GigaAMApp:
         threading.Thread(target=worker, daemon=True).start()
 
     def create_widgets(self):
-        # Настройка адаптивности главного окна
-        self.root.grid_rowconfigure(3, weight=1)  # Лог будет растягиваться
+        # Настройка адаптивности
+        self.root.grid_rowconfigure(3, weight=1)  # Лог растягивается
         self.root.grid_columnconfigure(0, weight=1)
 
         # --- Шапка (строка 0) ---
@@ -307,7 +307,7 @@ class GigaAMApp:
 
         # --- Левая часть шапки ---
         left = tk.Frame(header, bg="#2c3e50")
-        left.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
+        left.grid(row=0, column=0, sticky="nsew", padx=(10, 5), pady=10)
 
         tk.Label(left, text="🎤 GigaAM Complete", font=("Segoe UI", 18, "bold"),
                  bg="#2c3e50", fg="white").grid(row=0, column=0, sticky="w")
@@ -331,7 +331,7 @@ class GigaAMApp:
 
         # --- Правая часть шапки ---
         right = tk.Frame(header, bg="#2c3e50")
-        right.grid(row=0, column=1, sticky="nsew", padx=10, pady=10)
+        right.grid(row=0, column=1, sticky="nsew", padx=(5, 10), pady=10)
 
         tk.Label(right, text="📞 +7 905 570-28-04", font=("Segoe UI", 11),
                  bg="#2c3e50", fg="#ecf0f1").pack(anchor="e")
@@ -366,10 +366,10 @@ class GigaAMApp:
         log_frame.grid_columnconfigure(0, weight=1)
 
         accent_canvas = tk.Canvas(log_frame, width=3, bg="#f1c40f", highlightthickness=0)
-        accent_canvas.grid(row=0, column=0, sticky="ns")
+        accent_canvas.grid(row=0, column=0, sticky="ns", padx=(5, 0))
         self.log_text = scrolledtext.ScrolledText(log_frame, wrap=tk.WORD,
                                                    bg="#ffffff", fg="#000000", font=("Segoe UI", 10))
-        self.log_text.grid(row=0, column=1, sticky="nsew", padx=(5, 0))
+        self.log_text.grid(row=0, column=1, sticky="nsew")
 
         # --- Последняя фраза (строка 3) ---
         phrase_frame = tk.LabelFrame(self.root, text="Последняя распознанная фраза", bg="#f0f0f0", font=("Segoe UI", 10))
@@ -386,8 +386,9 @@ class GigaAMApp:
         btn_frame.grid(row=4, column=0, sticky="ew", padx=10, pady=(5, 10))
         btn_frame.grid_columnconfigure(0, weight=1)
 
+        # Равномерно распределяем кнопки
         buttons_inner_frame = tk.Frame(btn_frame, bg="#f0f0f0")
-        buttons_inner_frame.grid(row=0, column=0)
+        buttons_inner_frame.pack(expand=True)  # Центрируем
 
         btn_width = 17
         def on_enter(btn, color_on): btn.config(bg=color_on)
