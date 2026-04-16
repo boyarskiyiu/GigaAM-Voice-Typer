@@ -1,12 +1,12 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-GigaAM Complete — Версия 2.0.0 (16.04.2026)
+GigaAM Complete — Версия 2.0.1 (16.04.2026)
 (c) Боярский Игорь Юрьевич, 2026
 
-- ИСПРАВЛЕНО: Полностью переработанная, адаптивная геометрия на grid()
-- ДОБАВЛЕНО: Поддержка современных тем через ttkbootstrap (опционально)
-- СОХРАНЕНО: Крупные читаемые шрифты, автообновление, Яндекс.Спеллер
+- Возвращён классический яркий дизайн (тёмно-синяя шапка, цветные кнопки)
+- Сохранена исправленная геометрия на grid()
+- Автообновление, Яндекс.Спеллер, автоустановка зависимостей
 """
 
 import sys
@@ -39,7 +39,7 @@ os.environ["ORT_DISABLE_DML"] = "1"
 os.environ["ORT_DISABLE_OPENVINO"] = "1"
 os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
 
-CURRENT_VERSION = "2.0.0"
+CURRENT_VERSION = "2.0.1"
 GITHUB_REPO = "boyarskiyiu/GigaAM-Voice-Typer"
 
 # ----------------------------------------------------------------------
@@ -51,18 +51,11 @@ def install_pip_packages():
         "numpy", "keyboard", "scipy", "pyperclip", "librosa",
         "pyautogui", "pillow", "pyaspeller", "requests"
     ]
-    # Опционально: ttkbootstrap для современного интерфейса
-    try:
-        import ttkbootstrap
-    except ImportError:
-        required.append("ttkbootstrap")
-
     missing = []
     for pkg in required:
         pkg_name = pkg.replace("[cpu,hub]", "").replace("-", "_")
         if pkg_name == "pillow": pkg_name = "PIL"
         if pkg_name == "pyaspeller": pkg_name = "pyaspeller"
-        if pkg_name == "ttkbootstrap": pkg_name = "ttkbootstrap"
         try:
             __import__(pkg_name)
         except ImportError:
@@ -157,7 +150,7 @@ def get_best_mic():
 # ----------------------------------------------------------------------
 # ЗАЩИТА ОТ ПОВТОРНЫХ ЗАПУСКОВ
 # ----------------------------------------------------------------------
-lock_file = os.path.join(tempfile.gettempdir(), "gigaam_200.lock")
+lock_file = os.path.join(tempfile.gettempdir(), "gigaam_201.lock")
 def is_process_running(pid):
     try:
         output = subprocess.check_output(f'tasklist /FI "PID eq {pid}"', shell=True, encoding='cp866')
@@ -187,14 +180,6 @@ atexit.register(lambda: os.path.exists(lock_file) and os.unlink(lock_file))
 # ----------------------------------------------------------------------
 import tkinter as tk
 from tkinter import scrolledtext, messagebox, ttk
-
-# Попытка использовать современную тему
-try:
-    import ttkbootstrap as ttkb
-    from ttkbootstrap.constants import *
-    USE_BOOTSTRAP = True
-except ImportError:
-    USE_BOOTSTRAP = False
 
 # ----------------------------------------------------------------------
 # КЛАСС TOOLTIP
@@ -240,20 +225,17 @@ class GigaAMApp:
     def __init__(self, root):
         self.root = root
         self.root.title("GigaAM Complete — Голосовой ввод")
-        self.root.geometry("780x760") # Чуть шире и выше для комфорта
-        self.root.minsize(780, 760)   # Минимальный размер, чтобы интерфейс не ломался
+        self.root.geometry("780x760")
+        self.root.minsize(780, 760)
         self.root.configure(bg="#f0f0f0")
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
 
-        # Настройка стилей
-        if USE_BOOTSTRAP:
-            self.style = ttkb.Style(theme="flatly")
-        else:
-            self.style = ttk.Style()
-            self.style.theme_use('clam')
-            self.style.configure("green.Horizontal.TProgressbar", background="#2e7d32", troughcolor="#e0e0e0")
-            self.style.configure("orange.Horizontal.TProgressbar", background="#f57c00", troughcolor="#e0e0e0")
-            self.style.configure("red.Horizontal.TProgressbar", background="#c62828", troughcolor="#e0e0e0")
+        # Стандартная тема, но мы всё равно стилизуем Progressbar
+        self.style = ttk.Style()
+        self.style.theme_use('default')
+        self.style.configure("green.Horizontal.TProgressbar", background="#2e7d32", troughcolor="#e0e0e0")
+        self.style.configure("orange.Horizontal.TProgressbar", background="#f57c00", troughcolor="#e0e0e0")
+        self.style.configure("red.Horizontal.TProgressbar", background="#c62828", troughcolor="#e0e0e0")
 
         self.model = None
         self.listening = False
@@ -854,10 +836,7 @@ class GigaAMApp:
 # ТОЧКА ВХОДА
 # ----------------------------------------------------------------------
 def main():
-    if USE_BOOTSTRAP:
-        root = ttkb.Window(themename="flatly")
-    else:
-        root = tk.Tk()
+    root = tk.Tk()
     app = GigaAMApp(root)
     root.mainloop()
 
