@@ -1,11 +1,11 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-GigaAM Complete — Версия 2.0.3 (16.04.2026)
+GigaAM Complete — Версия 2.0.4 (16.04.2026)
 (c) Боярский Игорь Юрьевич, 2026
 
-- Полностью переработана компоновка интерфейса на pack() – всё ровно и предсказуемо
-- Кнопки равномерно распределены, шапка прижата к краям
+- Увеличена высота окна до 780 пикселей – кнопки больше не скрываются
+- Оптимизированы отступы, всё на виду
 - Крупные читаемые шрифты, автообновление, Яндекс.Спеллер
 """
 
@@ -39,7 +39,7 @@ os.environ["ORT_DISABLE_DML"] = "1"
 os.environ["ORT_DISABLE_OPENVINO"] = "1"
 os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
 
-CURRENT_VERSION = "2.0.3"
+CURRENT_VERSION = "2.0.4"
 GITHUB_REPO = "boyarskiyiu/GigaAM-Voice-Typer"
 
 # ----------------------------------------------------------------------
@@ -150,7 +150,7 @@ def get_best_mic():
 # ----------------------------------------------------------------------
 # ЗАЩИТА ОТ ПОВТОРНЫХ ЗАПУСКОВ
 # ----------------------------------------------------------------------
-lock_file = os.path.join(tempfile.gettempdir(), "gigaam_203.lock")
+lock_file = os.path.join(tempfile.gettempdir(), "gigaam_204.lock")
 def is_process_running(pid):
     try:
         output = subprocess.check_output(f'tasklist /FI "PID eq {pid}"', shell=True, encoding='cp866')
@@ -225,8 +225,8 @@ class GigaAMApp:
     def __init__(self, root):
         self.root = root
         self.root.title("GigaAM Complete — Голосовой ввод")
-        self.root.geometry("820x760")
-        self.root.minsize(820, 760)
+        self.root.geometry("820x780")   # Увеличена высота для кнопок
+        self.root.minsize(820, 780)
         self.root.configure(bg="#f0f0f0")
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
 
@@ -294,7 +294,7 @@ class GigaAMApp:
         header_outer = tk.Frame(self.root, bg="#f0f0f0", highlightthickness=2, highlightbackground="black")
         header_outer.pack(fill=tk.X, padx=10, pady=(10, 5))
 
-        header = tk.Frame(header_outer, bg="#2c3e50", height=240, relief=tk.RAISED, borderwidth=3)
+        header = tk.Frame(header_outer, bg="#2c3e50", height=230, relief=tk.RAISED, borderwidth=3)
         header.pack(fill=tk.X)
         header.pack_propagate(False)
 
