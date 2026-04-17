@@ -1,12 +1,11 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-GigaAM Complete — Версия 2.0.6 (17.04.2026)
+GigaAM Complete — Версия 2.0.7 (17.04.2026)
 (c) Боярский Игорь Юрьевич, 2026
 
-- Лог имеет фиксированную высоту, кнопки внизу всегда видны
-- Уменьшены межстрочные интервалы в шапке
-- Окно 820x780, всё сбалансировано
+- Уменьшен нижний отступ у кнопок (плотное прилегание)
+- Окно немного поджато по высоте (770)
 - Крупные читаемые шрифты, автообновление, Яндекс.Спеллер
 """
 
@@ -40,7 +39,7 @@ os.environ["ORT_DISABLE_DML"] = "1"
 os.environ["ORT_DISABLE_OPENVINO"] = "1"
 os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
 
-CURRENT_VERSION = "2.0.6"
+CURRENT_VERSION = "2.0.7"
 GITHUB_REPO = "boyarskiyiu/GigaAM-Voice-Typer"
 
 # ----------------------------------------------------------------------
@@ -151,7 +150,7 @@ def get_best_mic():
 # ----------------------------------------------------------------------
 # ЗАЩИТА ОТ ПОВТОРНЫХ ЗАПУСКОВ
 # ----------------------------------------------------------------------
-lock_file = os.path.join(tempfile.gettempdir(), "gigaam_206.lock")
+lock_file = os.path.join(tempfile.gettempdir(), "gigaam_207.lock")
 def is_process_running(pid):
     try:
         output = subprocess.check_output(f'tasklist /FI "PID eq {pid}"', shell=True, encoding='cp866')
@@ -226,8 +225,8 @@ class GigaAMApp:
     def __init__(self, root):
         self.root = root
         self.root.title("GigaAM Complete — Голосовой ввод")
-        self.root.geometry("820x780")
-        self.root.minsize(820, 780)
+        self.root.geometry("820x770")   # чуть ниже
+        self.root.minsize(820, 770)
         self.root.configure(bg="#f0f0f0")
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
 
@@ -354,11 +353,11 @@ class GigaAMApp:
 
         # --- Лог (фиксированная высота) ---
         log_frame = tk.LabelFrame(self.root, text="Лог работы", bg="#f0f0f0", font=("Segoe UI", 10))
-        log_frame.pack(fill=tk.X, padx=10, pady=5)  # не expand, чтобы не отбирать место
+        log_frame.pack(fill=tk.X, padx=10, pady=5)
 
         accent_canvas = tk.Canvas(log_frame, width=3, bg="#f1c40f", highlightthickness=0)
         accent_canvas.pack(side=tk.LEFT, fill=tk.Y, padx=(5, 0))
-        self.log_text = scrolledtext.ScrolledText(log_frame, wrap=tk.WORD, height=12,  # фиксированная высота в строках
+        self.log_text = scrolledtext.ScrolledText(log_frame, wrap=tk.WORD, height=12,
                                                    bg="#ffffff", fg="#000000", font=("Segoe UI", 10))
         self.log_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
@@ -371,9 +370,9 @@ class GigaAMApp:
                                    relief=tk.SUNKEN, borderwidth=2)
         self.phrase_text.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
 
-        # --- Кнопки ---
+        # --- Кнопки (уменьшен нижний отступ) ---
         btn_frame = tk.Frame(self.root, bg="#f0f0f0")
-        btn_frame.pack(fill=tk.X, padx=10, pady=(5, 10))
+        btn_frame.pack(fill=tk.X, padx=10, pady=(5, 5))   # было (5, 10), стало (5, 5)
 
         for i in range(5):
             btn_frame.columnconfigure(i, weight=1)
