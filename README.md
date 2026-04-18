@@ -1,6 +1,6 @@
 # 🎤 GigaAM Complete — Голосовой ввод с ИИ
 
-![Версия](https://img.shields.io/badge/version-2.0.14-blue)
+![Версия](https://img.shields.io/badge/version-2.0.15-blue)
 ![Лицензия](https://img.shields.io/badge/license-MIT-green)
 ![Платформа](https://img.shields.io/badge/platform-Windows%2010%2F11-lightgrey)
 

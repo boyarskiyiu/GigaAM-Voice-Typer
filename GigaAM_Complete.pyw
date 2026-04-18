@@ -1,12 +1,12 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-GigaAM Complete — Версия 2.0.14 (18.04.2026)
+GigaAM Complete — Версия 2.0.15 (18.04.2026)
 (c) Боярский Игорь Юрьевич, 2026
 
-- Окно всегда поверх остальных (Always on Top).
-- Минимальные отступы снизу (высота 705).
-- Исправлено предупреждение переполнения при калибровке.
+- Компактное окно 780x705, равномерные отступы.
+- Улучшена стабильность Яндекс.Спеллера.
+- Оптимизированы задержки (silence_dur = 0.6).
 """
 
 import sys
@@ -39,7 +39,7 @@ os.environ["ORT_DISABLE_DML"] = "1"
 os.environ["ORT_DISABLE_OPENVINO"] = "1"
 os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
 
-CURRENT_VERSION = "2.0.14"
+CURRENT_VERSION = "2.0.15"
 GITHUB_REPO = "boyarskiyiu/GigaAM-Voice-Typer"
 
 # ----------------------------------------------------------------------
@@ -92,7 +92,7 @@ import pyperclip
 from scipy.io.wavfile import write as write_wav
 import onnx_asr
 
-np.seterr(all='ignore')  # убираем предупреждения о переполнении
+np.seterr(all='ignore')
 
 try:
     from pyaspeller import YandexSpeller
@@ -152,7 +152,7 @@ def get_best_mic():
 # ----------------------------------------------------------------------
 # ЗАЩИТА ОТ ПОВТОРНЫХ ЗАПУСКОВ
 # ----------------------------------------------------------------------
-lock_file = os.path.join(tempfile.gettempdir(), "gigaam_2014.lock")
+lock_file = os.path.join(tempfile.gettempdir(), "gigaam_2015.lock")
 def is_process_running(pid):
     try:
         output = subprocess.check_output(f'tasklist /FI "PID eq {pid}"', shell=True, encoding='cp866')
@@ -227,13 +227,13 @@ class GigaAMApp:
     def __init__(self, root):
         self.root = root
         self.root.title("GigaAM Complete — Голосовой ввод")
-        self.root.geometry("820x705")            # поджатая высота
-        self.root.minsize(820, 705)
-        self.root.attributes('-topmost', True)   # всегда поверх других окон
+        self.root.geometry("780x705")            # уменьшена ширина до 780
+        self.root.minsize(780, 705)
+        self.root.attributes('-topmost', True)   # всегда поверх
         self.root.configure(bg="#f0f0f0")
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
 
-        # Устанавливаем иконку (если есть файл icon.ico в папке программы)
+        # Иконка окна (если есть icon.ico)
         try:
             icon_path = os.path.join(os.path.dirname(__file__), "icon.ico")
             if os.path.exists(icon_path):
@@ -252,7 +252,7 @@ class GigaAMApp:
         self.listening = False
         self.rate = 16000
         self.blocksize = 1024
-        self.silence_dur = 0.7
+        self.silence_dur = 0.6          # уменьшено для быстрой реакции
         self.min_speech_frames = 4
         self.threshold = 550
         self.device = None
@@ -301,15 +301,15 @@ class GigaAMApp:
         threading.Thread(target=worker, daemon=True).start()
 
     def create_widgets(self):
+        # Все отступы равномерные: padx=10, pady=10
         # --- Шапка ---
         header_outer = tk.Frame(self.root, bg="#f0f0f0", highlightthickness=2, highlightbackground="black")
-        header_outer.pack(fill=tk.X, padx=10, pady=(10, 0))
+        header_outer.pack(fill=tk.X, padx=10, pady=(10, 5))
 
         header = tk.Frame(header_outer, bg="#2c3e50", height=230, relief=tk.RAISED, borderwidth=3)
         header.pack(fill=tk.X)
         header.pack_propagate(False)
 
-        # Левая часть шапки
         left = tk.Frame(header, bg="#2c3e50")
         left.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=10, pady=10)
 
@@ -333,7 +333,6 @@ class GigaAMApp:
         tk.Label(left, text=mic_desc, font=("Segoe UI", 10), bg="#2c3e50", fg="#bdc3c7",
                  justify=tk.LEFT, anchor="w").pack(fill=tk.X, pady=(0, 5))
 
-        # Правая часть шапки
         right = tk.Frame(header, bg="#2c3e50")
         right.pack(side=tk.RIGHT, fill=tk.Y, padx=10, pady=10)
 
@@ -381,48 +380,48 @@ class GigaAMApp:
                                    relief=tk.SUNKEN, borderwidth=2)
         self.phrase_text.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
 
-        # --- Кнопки (прижаты к низу) ---
+        # --- Кнопки (отступ снизу 10, как и везде) ---
         btn_frame = tk.Frame(self.root, bg="#f0f0f0")
-        btn_frame.pack(fill=tk.X, padx=10, pady=(5, 0))
+        btn_frame.pack(fill=tk.X, padx=10, pady=(5, 10))
 
         for i in range(5):
             btn_frame.columnconfigure(i, weight=1)
 
-        btn_width = 17
+        btn_width = 16  # чуть уже, чтобы вписаться в 780
         def on_enter(btn, color_on): btn.config(bg=color_on)
         def on_leave(btn, color_off): btn.config(bg=color_off)
 
         self.btn_pause = tk.Button(btn_frame, text="▶ Возобновить (F2)", command=self.toggle_listening,
                                    bg="#4caf50", fg="white", width=btn_width, font=("Segoe UI", 10, "bold"))
-        self.btn_pause.grid(row=0, column=0, padx=5, pady=5)
+        self.btn_pause.grid(row=0, column=0, padx=3, pady=5)
         self.btn_pause.bind("<Enter>", lambda e: on_enter(self.btn_pause, "#81c784"))
         self.btn_pause.bind("<Leave>", lambda e: on_leave(self.btn_pause, "#4caf50"))
         ToolTip(self.btn_pause, "Приостановить/возобновить прослушивание микрофона")
 
         self.btn_fix = tk.Button(btn_frame, text="✏️ Исправить (F3)", command=self.fix_last_phrase,
                                  bg="#2196f3", fg="white", width=btn_width, font=("Segoe UI", 10, "bold"))
-        self.btn_fix.grid(row=0, column=1, padx=5, pady=5)
+        self.btn_fix.grid(row=0, column=1, padx=3, pady=5)
         self.btn_fix.bind("<Enter>", lambda e: on_enter(self.btn_fix, "#64b5f6"))
         self.btn_fix.bind("<Leave>", lambda e: on_leave(self.btn_fix, "#2196f3"))
         ToolTip(self.btn_fix, "Открыть окно для исправления последней фразы")
 
         self.btn_minimize = tk.Button(btn_frame, text="🗕 Свернуть (F4)", command=self.minimize_window,
                                       bg="#9e9e9e", fg="white", width=btn_width, font=("Segoe UI", 10, "bold"))
-        self.btn_minimize.grid(row=0, column=2, padx=5, pady=5)
+        self.btn_minimize.grid(row=0, column=2, padx=3, pady=5)
         self.btn_minimize.bind("<Enter>", lambda e: on_enter(self.btn_minimize, "#bdbdbd"))
         self.btn_minimize.bind("<Leave>", lambda e: on_leave(self.btn_minimize, "#9e9e9e"))
         ToolTip(self.btn_minimize, "Свернуть окно в панель задач")
 
         self.btn_update = tk.Button(btn_frame, text="⚡ Обновить", command=self.check_updates,
                                     bg="#4caf50", fg="white", width=btn_width, font=("Segoe UI", 10, "bold"))
-        self.btn_update.grid(row=0, column=3, padx=5, pady=5)
+        self.btn_update.grid(row=0, column=3, padx=3, pady=5)
         self.btn_update.bind("<Enter>", lambda e: on_enter(self.btn_update, "#81c784"))
         self.btn_update.bind("<Leave>", lambda e: on_leave(self.btn_update, "#4caf50"))
         ToolTip(self.btn_update, "Проверить и установить обновления")
 
         self.btn_about = tk.Button(btn_frame, text="ℹ️ О программе", command=self.show_about,
                                    bg="#607d8b", fg="white", width=btn_width, font=("Segoe UI", 10, "bold"))
-        self.btn_about.grid(row=0, column=4, padx=5, pady=5)
+        self.btn_about.grid(row=0, column=4, padx=3, pady=5)
         self.btn_about.bind("<Enter>", lambda e: on_enter(self.btn_about, "#90a4ae"))
         self.btn_about.bind("<Leave>", lambda e: on_leave(self.btn_about, "#607d8b"))
         ToolTip(self.btn_about, "Информация о программе")
@@ -432,7 +431,7 @@ class GigaAMApp:
         keyboard.add_hotkey('F4', self.minimize_window)
 
     # ------------------------------------------------------------------
-    # ОСТАЛЬНЫЕ МЕТОДЫ (без изменений, кроме калибровки)
+    # ОСТАЛЬНЫЕ МЕТОДЫ (спеллер улучшен)
     # ------------------------------------------------------------------
     def compare_versions(self, v1, v2):
         def normalize(v):
@@ -783,12 +782,17 @@ class GigaAMApp:
                 text = normalize_punctuation(text)
                 if text:
                     text = text[0].upper() + text[1:]
+                # --- УЛУЧШЕННЫЙ СПЕЛЛЕР ---
                 if self.speller and text and len(text) > 3:
                     try:
+                        # Повторная инициализация при необходимости
+                        if not hasattr(self.speller, 'spelled'):
+                            self.speller = YandexSpeller(lang='ru', find_repeat_words=True)
                         text = self.speller.spelled(text)
                         self.log(f"🪄 После спеллера: '{text}'")
-                    except:
-                        pass
+                    except Exception as e:
+                        self.log(f"⚠️ Ошибка спеллера: {e}")
+                # -------------------------
                 if text and text != self.last_final and len(text) > 1:
                     elapsed = time.time() - self.record_start
                     self.log(f"✅ {elapsed:.1f} сек: {text}")
