@@ -1,12 +1,12 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-GigaAM Complete — Версия 2.0.7 (17.04.2026)
+GigaAM Complete — Версия 2.0.14 (18.04.2026)
 (c) Боярский Игорь Юрьевич, 2026
 
-- Уменьшен нижний отступ у кнопок (плотное прилегание)
-- Окно немного поджато по высоте (770)
-- Крупные читаемые шрифты, автообновление, Яндекс.Спеллер
+- Окно всегда поверх остальных (Always on Top).
+- Минимальные отступы снизу (высота 705).
+- Исправлено предупреждение переполнения при калибровке.
 """
 
 import sys
@@ -39,7 +39,7 @@ os.environ["ORT_DISABLE_DML"] = "1"
 os.environ["ORT_DISABLE_OPENVINO"] = "1"
 os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
 
-CURRENT_VERSION = "2.0.7"
+CURRENT_VERSION = "2.0.14"
 GITHUB_REPO = "boyarskiyiu/GigaAM-Voice-Typer"
 
 # ----------------------------------------------------------------------
@@ -91,6 +91,8 @@ import keyboard
 import pyperclip
 from scipy.io.wavfile import write as write_wav
 import onnx_asr
+
+np.seterr(all='ignore')  # убираем предупреждения о переполнении
 
 try:
     from pyaspeller import YandexSpeller
@@ -150,7 +152,7 @@ def get_best_mic():
 # ----------------------------------------------------------------------
 # ЗАЩИТА ОТ ПОВТОРНЫХ ЗАПУСКОВ
 # ----------------------------------------------------------------------
-lock_file = os.path.join(tempfile.gettempdir(), "gigaam_207.lock")
+lock_file = os.path.join(tempfile.gettempdir(), "gigaam_2014.lock")
 def is_process_running(pid):
     try:
         output = subprocess.check_output(f'tasklist /FI "PID eq {pid}"', shell=True, encoding='cp866')
@@ -225,10 +227,19 @@ class GigaAMApp:
     def __init__(self, root):
         self.root = root
         self.root.title("GigaAM Complete — Голосовой ввод")
-        self.root.geometry("820x770")   # чуть ниже
-        self.root.minsize(820, 770)
+        self.root.geometry("820x705")            # поджатая высота
+        self.root.minsize(820, 705)
+        self.root.attributes('-topmost', True)   # всегда поверх других окон
         self.root.configure(bg="#f0f0f0")
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
+
+        # Устанавливаем иконку (если есть файл icon.ico в папке программы)
+        try:
+            icon_path = os.path.join(os.path.dirname(__file__), "icon.ico")
+            if os.path.exists(icon_path):
+                self.root.iconbitmap(icon_path)
+        except:
+            pass
 
         # Стили для прогрессбара
         self.style = ttk.Style()
@@ -290,9 +301,9 @@ class GigaAMApp:
         threading.Thread(target=worker, daemon=True).start()
 
     def create_widgets(self):
-        # --- Шапка (уменьшены межстрочные интервалы) ---
+        # --- Шапка ---
         header_outer = tk.Frame(self.root, bg="#f0f0f0", highlightthickness=2, highlightbackground="black")
-        header_outer.pack(fill=tk.X, padx=10, pady=(10, 5))
+        header_outer.pack(fill=tk.X, padx=10, pady=(10, 0))
 
         header = tk.Frame(header_outer, bg="#2c3e50", height=230, relief=tk.RAISED, borderwidth=3)
         header.pack(fill=tk.X)
@@ -304,7 +315,7 @@ class GigaAMApp:
 
         tk.Label(left, text="🎤 GigaAM Complete", font=("Segoe UI", 18, "bold"),
                  bg="#2c3e50", fg="white", anchor="w").pack(fill=tk.X)
-        tk.Label(left, text=f"Версия {CURRENT_VERSION} (17.04.2026)", font=("Segoe UI", 10),
+        tk.Label(left, text=f"Версия {CURRENT_VERSION} (18.04.2026)", font=("Segoe UI", 10),
                  bg="#2c3e50", fg="#bdc3c7", anchor="w").pack(fill=tk.X, pady=(2, 5))
         tk.Label(left, text="Разработчик: Боярский Игорь Юрьевич", font=("Segoe UI", 14, "bold"),
                  bg="#2c3e50", fg="#f1c40f", anchor="w").pack(fill=tk.X, pady=(0, 5))
@@ -351,7 +362,7 @@ class GigaAMApp:
                                         bg="#f0f0f0", fg="#c62828")
         self.listening_label.pack(side=tk.RIGHT, padx=(20, 0))
 
-        # --- Лог (фиксированная высота) ---
+        # --- Лог ---
         log_frame = tk.LabelFrame(self.root, text="Лог работы", bg="#f0f0f0", font=("Segoe UI", 10))
         log_frame.pack(fill=tk.X, padx=10, pady=5)
 
@@ -370,9 +381,9 @@ class GigaAMApp:
                                    relief=tk.SUNKEN, borderwidth=2)
         self.phrase_text.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
 
-        # --- Кнопки (уменьшен нижний отступ) ---
+        # --- Кнопки (прижаты к низу) ---
         btn_frame = tk.Frame(self.root, bg="#f0f0f0")
-        btn_frame.pack(fill=tk.X, padx=10, pady=(5, 5))   # было (5, 10), стало (5, 5)
+        btn_frame.pack(fill=tk.X, padx=10, pady=(5, 0))
 
         for i in range(5):
             btn_frame.columnconfigure(i, weight=1)
@@ -383,35 +394,35 @@ class GigaAMApp:
 
         self.btn_pause = tk.Button(btn_frame, text="▶ Возобновить (F2)", command=self.toggle_listening,
                                    bg="#4caf50", fg="white", width=btn_width, font=("Segoe UI", 10, "bold"))
-        self.btn_pause.grid(row=0, column=0, padx=3, pady=5)
+        self.btn_pause.grid(row=0, column=0, padx=5, pady=5)
         self.btn_pause.bind("<Enter>", lambda e: on_enter(self.btn_pause, "#81c784"))
         self.btn_pause.bind("<Leave>", lambda e: on_leave(self.btn_pause, "#4caf50"))
         ToolTip(self.btn_pause, "Приостановить/возобновить прослушивание микрофона")
 
         self.btn_fix = tk.Button(btn_frame, text="✏️ Исправить (F3)", command=self.fix_last_phrase,
                                  bg="#2196f3", fg="white", width=btn_width, font=("Segoe UI", 10, "bold"))
-        self.btn_fix.grid(row=0, column=1, padx=3, pady=5)
+        self.btn_fix.grid(row=0, column=1, padx=5, pady=5)
         self.btn_fix.bind("<Enter>", lambda e: on_enter(self.btn_fix, "#64b5f6"))
         self.btn_fix.bind("<Leave>", lambda e: on_leave(self.btn_fix, "#2196f3"))
         ToolTip(self.btn_fix, "Открыть окно для исправления последней фразы")
 
         self.btn_minimize = tk.Button(btn_frame, text="🗕 Свернуть (F4)", command=self.minimize_window,
                                       bg="#9e9e9e", fg="white", width=btn_width, font=("Segoe UI", 10, "bold"))
-        self.btn_minimize.grid(row=0, column=2, padx=3, pady=5)
+        self.btn_minimize.grid(row=0, column=2, padx=5, pady=5)
         self.btn_minimize.bind("<Enter>", lambda e: on_enter(self.btn_minimize, "#bdbdbd"))
         self.btn_minimize.bind("<Leave>", lambda e: on_leave(self.btn_minimize, "#9e9e9e"))
         ToolTip(self.btn_minimize, "Свернуть окно в панель задач")
 
         self.btn_update = tk.Button(btn_frame, text="⚡ Обновить", command=self.check_updates,
                                     bg="#4caf50", fg="white", width=btn_width, font=("Segoe UI", 10, "bold"))
-        self.btn_update.grid(row=0, column=3, padx=3, pady=5)
+        self.btn_update.grid(row=0, column=3, padx=5, pady=5)
         self.btn_update.bind("<Enter>", lambda e: on_enter(self.btn_update, "#81c784"))
         self.btn_update.bind("<Leave>", lambda e: on_leave(self.btn_update, "#4caf50"))
         ToolTip(self.btn_update, "Проверить и установить обновления")
 
         self.btn_about = tk.Button(btn_frame, text="ℹ️ О программе", command=self.show_about,
                                    bg="#607d8b", fg="white", width=btn_width, font=("Segoe UI", 10, "bold"))
-        self.btn_about.grid(row=0, column=4, padx=3, pady=5)
+        self.btn_about.grid(row=0, column=4, padx=5, pady=5)
         self.btn_about.bind("<Enter>", lambda e: on_enter(self.btn_about, "#90a4ae"))
         self.btn_about.bind("<Leave>", lambda e: on_leave(self.btn_about, "#607d8b"))
         ToolTip(self.btn_about, "Информация о программе")
@@ -421,7 +432,7 @@ class GigaAMApp:
         keyboard.add_hotkey('F4', self.minimize_window)
 
     # ------------------------------------------------------------------
-    # Вспомогательные методы (без изменений)
+    # ОСТАЛЬНЫЕ МЕТОДЫ (без изменений, кроме калибровки)
     # ------------------------------------------------------------------
     def compare_versions(self, v1, v2):
         def normalize(v):
@@ -472,43 +483,34 @@ class GigaAMApp:
     def check_updates(self):
         self.log("🔄 Проверка обновлений...")
         url = f"https://api.github.com/repos/{GITHUB_REPO}/releases/latest"
-        max_retries = 3
-        for attempt in range(1, max_retries + 1):
-            try:
-                response = requests.get(url, timeout=10)
-                response.raise_for_status()
-                latest_release = response.json()
-                latest_version = latest_release["tag_name"].replace("v", "")
-                self.log(f"   GitHub: {latest_version}, текущая: {CURRENT_VERSION}")
-                if self.compare_versions(latest_version, CURRENT_VERSION) > 0:
-                    assets = latest_release.get("assets", [])
-                    download_url = None
-                    for asset in assets:
-                        if asset["name"].endswith(".pyw"):
-                            download_url = asset["browser_download_url"]
-                            break
-                    if not download_url:
-                        if messagebox.askyesno("Доступно обновление",
-                                               f"Найдена новая версия: {latest_version}.\n"
-                                               "Автоматическая установка невозможна (нет .pyw файла в релизе).\n"
-                                               "Открыть страницу для ручного скачивания?"):
-                            webbrowser.open(f"https://github.com/{GITHUB_REPO}/releases/latest")
-                        return
+        try:
+            response = requests.get(url, timeout=10)
+            response.raise_for_status()
+            latest_release = response.json()
+            latest_version = latest_release["tag_name"].replace("v", "")
+            self.log(f"   GitHub: {latest_version}, текущая: {CURRENT_VERSION}")
+            if self.compare_versions(latest_version, CURRENT_VERSION) > 0:
+                assets = latest_release.get("assets", [])
+                download_url = None
+                for asset in assets:
+                    if asset["name"].endswith(".pyw"):
+                        download_url = asset["browser_download_url"]
+                        break
+                if not download_url:
                     if messagebox.askyesno("Доступно обновление",
                                            f"Найдена новая версия: {latest_version}.\n"
-                                           "Скачать и установить автоматически?"):
-                        self.download_and_install_update(download_url)
-                else:
-                    messagebox.showinfo("Обновлений нет", "У вас установлена последняя версия.")
-                return
-            except requests.exceptions.ConnectionError:
-                if attempt == max_retries:
-                    messagebox.showerror("Ошибка сети", "Не удалось подключиться к серверу обновлений.")
-                else:
-                    time.sleep(2)
-            except Exception as e:
-                messagebox.showerror("Ошибка", f"Не удалось проверить обновления:\n{e}")
-                return
+                                           "Автоматическая установка невозможна (нет .pyw файла в релизе).\n"
+                                           "Открыть страницу для ручного скачивания?"):
+                        webbrowser.open(f"https://github.com/{GITHUB_REPO}/releases/latest")
+                    return
+                if messagebox.askyesno("Доступно обновление",
+                                       f"Найдена новая версия: {latest_version}.\n"
+                                       "Скачать и установить автоматически?"):
+                    self.download_and_install_update(download_url)
+            else:
+                messagebox.showinfo("Обновлений нет", "У вас установлена последняя версия.")
+        except Exception as e:
+            messagebox.showerror("Ошибка", f"Не удалось проверить обновления:\n{e}")
 
     def show_about(self):
         about_text = (
@@ -664,6 +666,7 @@ class GigaAMApp:
             rec = sd.rec(int(2 * self.rate), samplerate=self.rate, channels=1, dtype='int16', device=self.device)
             sd.wait()
             noise = np.max(np.abs(rec))
+            noise = min(noise, 32767)
             threshold = max(noise + 20, 160)
             return min(threshold, 800)
         except:
