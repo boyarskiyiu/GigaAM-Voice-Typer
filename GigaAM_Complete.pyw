@@ -1,12 +1,13 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-GigaAM Complete — Версия 2.0.15 (18.04.2026)
+GigaAM Complete — Версия 2.0.17 (18.04.2026)
 (c) Боярский Игорь Юрьевич, 2026
 
-- Компактное окно 780x705, равномерные отступы.
-- Улучшена стабильность Яндекс.Спеллера.
-- Оптимизированы задержки (silence_dur = 0.6).
+- Кнопки прижаты к низу, лог растягивается при изменении размера окна.
+- Компактный дизайн (760x700), улучшенные иконки на кнопках.
+- Оптимизированные задержки и стабильная работа Яндекс.Спеллера.
+- Автоустановка зависимостей при первом запуске.
 """
 
 import sys
@@ -39,7 +40,7 @@ os.environ["ORT_DISABLE_DML"] = "1"
 os.environ["ORT_DISABLE_OPENVINO"] = "1"
 os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
 
-CURRENT_VERSION = "2.0.15"
+CURRENT_VERSION = "2.0.17"
 GITHUB_REPO = "boyarskiyiu/GigaAM-Voice-Typer"
 
 # ----------------------------------------------------------------------
@@ -152,7 +153,7 @@ def get_best_mic():
 # ----------------------------------------------------------------------
 # ЗАЩИТА ОТ ПОВТОРНЫХ ЗАПУСКОВ
 # ----------------------------------------------------------------------
-lock_file = os.path.join(tempfile.gettempdir(), "gigaam_2015.lock")
+lock_file = os.path.join(tempfile.gettempdir(), "gigaam_2017.lock")
 def is_process_running(pid):
     try:
         output = subprocess.check_output(f'tasklist /FI "PID eq {pid}"', shell=True, encoding='cp866')
@@ -227,8 +228,8 @@ class GigaAMApp:
     def __init__(self, root):
         self.root = root
         self.root.title("GigaAM Complete — Голосовой ввод")
-        self.root.geometry("780x705")            # уменьшена ширина до 780
-        self.root.minsize(780, 705)
+        self.root.geometry("760x700")            # компактный размер
+        self.root.minsize(760, 650)
         self.root.attributes('-topmost', True)   # всегда поверх
         self.root.configure(bg="#f0f0f0")
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
@@ -252,7 +253,7 @@ class GigaAMApp:
         self.listening = False
         self.rate = 16000
         self.blocksize = 1024
-        self.silence_dur = 0.6          # уменьшено для быстрой реакции
+        self.silence_dur = 0.6
         self.min_speech_frames = 4
         self.threshold = 550
         self.device = None
@@ -301,10 +302,20 @@ class GigaAMApp:
         threading.Thread(target=worker, daemon=True).start()
 
     def create_widgets(self):
-        # Все отступы равномерные: padx=10, pady=10
+        # Главный контейнер: верхняя часть растягивается, нижняя (кнопки) прижата
+        self.root.grid_rowconfigure(0, weight=1)   # верхний контейнер растягивается
+        self.root.grid_rowconfigure(1, weight=0)   # кнопки не растягиваются
+        self.root.grid_columnconfigure(0, weight=1)
+
+        # Верхний контейнер (шапка, статус, лог, фраза)
+        top_frame = tk.Frame(self.root, bg="#f0f0f0")
+        top_frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=(10, 5))
+        top_frame.grid_rowconfigure(3, weight=1)   # лог растягивается
+        top_frame.grid_columnconfigure(0, weight=1)
+
         # --- Шапка ---
-        header_outer = tk.Frame(self.root, bg="#f0f0f0", highlightthickness=2, highlightbackground="black")
-        header_outer.pack(fill=tk.X, padx=10, pady=(10, 5))
+        header_outer = tk.Frame(top_frame, bg="#f0f0f0", highlightthickness=2, highlightbackground="black")
+        header_outer.grid(row=0, column=0, sticky="ew", pady=(0, 5))
 
         header = tk.Frame(header_outer, bg="#2c3e50", height=230, relief=tk.RAISED, borderwidth=3)
         header.pack(fill=tk.X)
@@ -344,8 +355,8 @@ class GigaAMApp:
                  font=("Segoe UI", 11, "bold"), bg="#2c3e50", fg="#f1c40f", justify=tk.RIGHT, anchor="e").pack(fill=tk.X)
 
         # --- Статусная строка ---
-        status_frame = tk.Frame(self.root, bg="#f0f0f0")
-        status_frame.pack(fill=tk.X, padx=10, pady=5)
+        status_frame = tk.Frame(top_frame, bg="#f0f0f0")
+        status_frame.grid(row=1, column=0, sticky="ew", pady=5)
 
         self.status_label = tk.Label(status_frame, text="⏳ Инициализация...", font=("Segoe UI", 10, "bold"), bg="#f0f0f0")
         self.status_label.pack(side=tk.LEFT)
@@ -361,44 +372,45 @@ class GigaAMApp:
                                         bg="#f0f0f0", fg="#c62828")
         self.listening_label.pack(side=tk.RIGHT, padx=(20, 0))
 
-        # --- Лог ---
-        log_frame = tk.LabelFrame(self.root, text="Лог работы", bg="#f0f0f0", font=("Segoe UI", 10))
-        log_frame.pack(fill=tk.X, padx=10, pady=5)
+        # --- Лог (растягивается) ---
+        log_frame = tk.LabelFrame(top_frame, text="Лог работы", bg="#f0f0f0", font=("Segoe UI", 10))
+        log_frame.grid(row=2, column=0, sticky="nsew", pady=5)
 
         accent_canvas = tk.Canvas(log_frame, width=3, bg="#f1c40f", highlightthickness=0)
         accent_canvas.pack(side=tk.LEFT, fill=tk.Y, padx=(5, 0))
-        self.log_text = scrolledtext.ScrolledText(log_frame, wrap=tk.WORD, height=12,
+        self.log_text = scrolledtext.ScrolledText(log_frame, wrap=tk.WORD, height=10,
                                                    bg="#ffffff", fg="#000000", font=("Segoe UI", 10))
         self.log_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
         # --- Последняя фраза ---
-        phrase_frame = tk.LabelFrame(self.root, text="Последняя распознанная фраза", bg="#f0f0f0", font=("Segoe UI", 10))
-        phrase_frame.pack(fill=tk.X, padx=10, pady=5)
+        phrase_frame = tk.LabelFrame(top_frame, text="Последняя распознанная фраза", bg="#f0f0f0", font=("Segoe UI", 10))
+        phrase_frame.grid(row=3, column=0, sticky="ew", pady=5)
 
         self.phrase_text = tk.Text(phrase_frame, height=2, wrap=tk.WORD,
                                    bg="#ffffff", fg="#000000", font=("Segoe UI", 11),
                                    relief=tk.SUNKEN, borderwidth=2)
         self.phrase_text.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
 
-        # --- Кнопки (отступ снизу 10, как и везде) ---
+        # --- Кнопки (всегда прижаты к низу) ---
         btn_frame = tk.Frame(self.root, bg="#f0f0f0")
-        btn_frame.pack(fill=tk.X, padx=10, pady=(5, 10))
+        btn_frame.grid(row=1, column=0, sticky="ew", padx=10, pady=(5, 10))
 
         for i in range(5):
             btn_frame.columnconfigure(i, weight=1)
 
-        btn_width = 16  # чуть уже, чтобы вписаться в 780
+        btn_width = 16
         def on_enter(btn, color_on): btn.config(bg=color_on)
         def on_leave(btn, color_off): btn.config(bg=color_off)
 
-        self.btn_pause = tk.Button(btn_frame, text="▶ Возобновить (F2)", command=self.toggle_listening,
+        # Кнопки с улучшенными иконками
+        self.btn_pause = tk.Button(btn_frame, text="⏯ Возобновить (F2)", command=self.toggle_listening,
                                    bg="#4caf50", fg="white", width=btn_width, font=("Segoe UI", 10, "bold"))
         self.btn_pause.grid(row=0, column=0, padx=3, pady=5)
         self.btn_pause.bind("<Enter>", lambda e: on_enter(self.btn_pause, "#81c784"))
         self.btn_pause.bind("<Leave>", lambda e: on_leave(self.btn_pause, "#4caf50"))
         ToolTip(self.btn_pause, "Приостановить/возобновить прослушивание микрофона")
 
-        self.btn_fix = tk.Button(btn_frame, text="✏️ Исправить (F3)", command=self.fix_last_phrase,
+        self.btn_fix = tk.Button(btn_frame, text="✎ Исправить (F3)", command=self.fix_last_phrase,
                                  bg="#2196f3", fg="white", width=btn_width, font=("Segoe UI", 10, "bold"))
         self.btn_fix.grid(row=0, column=1, padx=3, pady=5)
         self.btn_fix.bind("<Enter>", lambda e: on_enter(self.btn_fix, "#64b5f6"))
@@ -412,7 +424,7 @@ class GigaAMApp:
         self.btn_minimize.bind("<Leave>", lambda e: on_leave(self.btn_minimize, "#9e9e9e"))
         ToolTip(self.btn_minimize, "Свернуть окно в панель задач")
 
-        self.btn_update = tk.Button(btn_frame, text="⚡ Обновить", command=self.check_updates,
+        self.btn_update = tk.Button(btn_frame, text="🔄 Обновить", command=self.check_updates,
                                     bg="#4caf50", fg="white", width=btn_width, font=("Segoe UI", 10, "bold"))
         self.btn_update.grid(row=0, column=3, padx=3, pady=5)
         self.btn_update.bind("<Enter>", lambda e: on_enter(self.btn_update, "#81c784"))
@@ -431,7 +443,7 @@ class GigaAMApp:
         keyboard.add_hotkey('F4', self.minimize_window)
 
     # ------------------------------------------------------------------
-    # ОСТАЛЬНЫЕ МЕТОДЫ (спеллер улучшен)
+    # ОСТАЛЬНЫЕ МЕТОДЫ (без изменений)
     # ------------------------------------------------------------------
     def compare_versions(self, v1, v2):
         def normalize(v):
@@ -548,7 +560,7 @@ class GigaAMApp:
             self.log("Возобновление работы")
         else:
             self.listening_label.config(text="○ ПАУЗА", fg="#c62828")
-            self.btn_pause.config(text="▶ Возобновить (F2)", bg="#4caf50")
+            self.btn_pause.config(text="⏯ Возобновить (F2)", bg="#4caf50")
             self.log("Пауза")
 
     def minimize_window(self):
@@ -785,7 +797,6 @@ class GigaAMApp:
                 # --- УЛУЧШЕННЫЙ СПЕЛЛЕР ---
                 if self.speller and text and len(text) > 3:
                     try:
-                        # Повторная инициализация при необходимости
                         if not hasattr(self.speller, 'spelled'):
                             self.speller = YandexSpeller(lang='ru', find_repeat_words=True)
                         text = self.speller.spelled(text)
