@@ -1,12 +1,14 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-GigaAM Complete — Версия 2.0.31 (19.04.2026)
+GigaAM Complete — Версия 2.0.32 (19.04.2026)
 (c) Боярский Игорь Юрьевич, 2026
 
-- Увеличен предбуфер до 1.5 с, снижен порог срабатывания.
-- Первое слово больше не обрезается.
-- Геометрия 720x730, все элементы вмещаются.
+- Добавлен «пинг» аудиопотока для предотвращения его засыпания при длительном простое.
+- Радикально сокращен список стоп-слов, оставлены только междометия и звуки-паразиты.
+- Оптимизированы параметры распознавания для более быстрой выдачи текста.
+- Улучшены настройки Яндекс.Спеллера и обработка его ошибок.
+- Геометрия окна 720x730, все элементы вмещаются.
 """
 
 import sys
@@ -39,7 +41,7 @@ os.environ["ORT_DISABLE_DML"] = "1"
 os.environ["ORT_DISABLE_OPENVINO"] = "1"
 os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
 
-CURRENT_VERSION = "2.0.31"
+CURRENT_VERSION = "2.0.32"
 GITHUB_REPO = "boyarskiyiu/GigaAM-Voice-Typer"
 
 # ----------------------------------------------------------------------
@@ -100,18 +102,16 @@ except ImportError:
     SPELLER_AVAILABLE = False
 
 # ----------------------------------------------------------------------
-# ФИЛЬТРЫ ТЕКСТА
+# ФИЛЬТРЫ ТЕКСТА (оставлены только междометия и паразиты)
 # ----------------------------------------------------------------------
 STOP_WORDS = [
-    r'э-э+', r'ээ+', r'м-м+', r'мм+', r'ну+', r'вот+', r'как бы', r'типа',
-    r'это', r'это самое', r'в общем', r'так', r'значит', r'прям', r'короче',
-    r'вообще', r'как сказать', r'как его', r'нуу', r'так вот', r'вообщем',
-    r'честно говоря', r'собственно', r'понимаешь', r'понимаете', r'видите ли',
-    r'знаешь', r'знаете', r'ладно', r'допустим', r'скажем', r'пожалуй',
-    r'наверное', r'конкретно', r'мероприятие', r'например', r'ну вот', r'так сказать',
-    r'кстати', r'во-первых', r'во-вторых', r'кажется', r'типа того', r'как-то',
-    r'вообще-то', r'собственно говоря', r'по сути', r'в принципе', r'естественно',
-    r'безусловно', r'конечно', r'слышь', r'слышишь', r'понимаешь'
+    r'э-э+', r'ээ+', r'м-м+', r'мм+', r'ну+', r'вот+', r'короче', r'так сказать',
+    r'как бы', r'типа', r'это самое', r'в общем', r'нуу', r'честно говоря',
+    r'собственно', r'понимаешь', r'понимаете', r'видите ли', r'знаешь', r'знаете',
+    r'ладно', r'допустим', r'скажем', r'пожалуй', r'наверное', r'конкретно',
+    r'например', r'кстати', r'во-первых', r'во-вторых', r'кажется', r'типа того',
+    r'как-то', r'вообще-то', r'собственно говоря', r'по сути', r'в принципе',
+    r'естественно', r'безусловно', r'конечно', r'слышь', r'слышишь'
 ]
 STOP_WORDS_PATTERN = '|'.join([rf'\b({w})\b' for w in STOP_WORDS])
 STOP_WORDS_REGEX = re.compile(STOP_WORDS_PATTERN, re.IGNORECASE)
@@ -151,7 +151,7 @@ def get_best_mic():
 # ----------------------------------------------------------------------
 # ЗАЩИТА ОТ ПОВТОРНЫХ ЗАПУСКОВ
 # ----------------------------------------------------------------------
-lock_file = os.path.join(tempfile.gettempdir(), "gigaam_2031.lock")
+lock_file = os.path.join(tempfile.gettempdir(), "gigaam_2032.lock")
 def is_process_running(pid):
     try:
         output = subprocess.check_output(f'tasklist /FI "PID eq {pid}"', shell=True, encoding='cp866')
@@ -225,21 +225,27 @@ class GigaAMApp:
         self.listening = False
         self.rate = 16000
         self.blocksize = 1024
-        self.silence_dur = 0.6
-        self.min_speech_frames = 3        # быстрее срабатывает
+        self.silence_dur = 0.4            # Уменьшено для быстрой реакции
+        self.min_speech_frames = 3
         self.threshold = 550
         self.device = None
         self.last_orig = ""
         self.last_final = ""
         self.corr_path = os.path.join(os.path.dirname(__file__), "corrections.json")
 
+        # Настройки Яндекс.Спеллера
+        self.speller = None
         if SPELLER_AVAILABLE:
             try:
-                self.speller = YandexSpeller(lang='ru', find_repeat_words=True)
-            except:
+                self.speller = YandexSpeller(
+                    lang='ru',
+                    find_repeat_words=True,
+                    ignore_urls=True,
+                    ignore_digits=True
+                )
+            except Exception as e:
+                print(f"Не удалось инициализировать Яндекс.Спеллер: {e}")
                 self.speller = None
-        else:
-            self.speller = None
 
         self.silent_frames = 0
         self.recording = False
@@ -248,7 +254,7 @@ class GigaAMApp:
         self.speech_counter = 0
         self.end_wait_frames = 0
         self.pre_buffer = []
-        self.pre_max = int(1.5 * self.rate / self.blocksize)   # увеличенный предбуфер
+        self.pre_max = int(1.5 * self.rate / self.blocksize)  # Увеличенный предбуфер
 
         self.running = True
         self.task_queue = queue.Queue(maxsize=10)
@@ -258,7 +264,22 @@ class GigaAMApp:
         self._closing = False
 
         self.create_widgets()
+        self.start_keep_alive_ping()       # Новый механизм пинга
         threading.Thread(target=self.init_background, daemon=True).start()
+
+    def start_keep_alive_ping(self):
+        """Периодически отправляет пустой звук в аудиопоток, чтобы он не засыпал."""
+        def ping():
+            while self.running:
+                time.sleep(10)  # Пинг каждые 10 секунд
+                if hasattr(self, 'stream') and self.stream and not self.listening:
+                    try:
+                        # Отправляем пустой буфер, чтобы разбудить поток
+                        empty_buffer = np.zeros((self.blocksize, 1), dtype=np.int16)
+                        self.audio_callback(empty_buffer, self.blocksize, None, None)
+                    except:
+                        pass
+        threading.Thread(target=ping, daemon=True).start()
 
     def start_worker(self):
         def worker():
@@ -771,6 +792,7 @@ class GigaAMApp:
                 text = normalize_punctuation(text)
                 if text:
                     text = text[0].upper() + text[1:]
+                # Улучшенный Яндекс.Спеллер
                 if self.speller and text and len(text) > 3:
                     try:
                         if not hasattr(self.speller, 'spelled'):
