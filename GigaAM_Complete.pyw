@@ -1,12 +1,12 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-GigaAM Complete — Версия 2.0.26 (19.04.2026)
+GigaAM Complete — Версия 2.0.27 (19.04.2026)
 (c) Боярский Игорь Юрьевич, 2026
 
-- Увеличена ширина кнопок (18 символов) и окна (720px).
-- Шрифт кнопок 9.5 pt bold, все шрифты выровнены для читаемости.
-- Компактный, но вместительный интерфейс.
+- Скруглённые объёмные кнопки (стиль ttk).
+- Скруглённые углы окна (системное оформление).
+- Современный интерфейс с улучшенной читаемостью.
 """
 
 import sys
@@ -39,7 +39,7 @@ os.environ["ORT_DISABLE_DML"] = "1"
 os.environ["ORT_DISABLE_OPENVINO"] = "1"
 os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
 
-CURRENT_VERSION = "2.0.26"
+CURRENT_VERSION = "2.0.27"
 GITHUB_REPO = "boyarskiyiu/GigaAM-Voice-Typer"
 
 # ----------------------------------------------------------------------
@@ -151,7 +151,7 @@ def get_best_mic():
 # ----------------------------------------------------------------------
 # ЗАЩИТА ОТ ПОВТОРНЫХ ЗАПУСКОВ
 # ----------------------------------------------------------------------
-lock_file = os.path.join(tempfile.gettempdir(), "gigaam_2026.lock")
+lock_file = os.path.join(tempfile.gettempdir(), "gigaam_2027.lock")
 def is_process_running(pid):
     try:
         output = subprocess.check_output(f'tasklist /FI "PID eq {pid}"', shell=True, encoding='cp866')
@@ -174,7 +174,7 @@ with open(lock_file, 'w') as f:
 atexit.register(lambda: os.path.exists(lock_file) and os.unlink(lock_file))
 
 # ----------------------------------------------------------------------
-# TKINTER И СТИЛИ
+# TKINTER И СТИЛИ (СКРУГЛЁННЫЕ КНОПКИ)
 # ----------------------------------------------------------------------
 import tkinter as tk
 from tkinter import scrolledtext, messagebox, ttk
@@ -215,11 +215,24 @@ class GigaAMApp:
     def __init__(self, root):
         self.root = root
         self.root.title("GigaAM Complete — Голосовой ввод")
-        self.root.geometry("720x700")            # ширина увеличена до 720
+        self.root.geometry("720x700")
         self.root.minsize(720, 670)
         self.root.attributes('-topmost', True)
         self.root.configure(bg="#f0f0f0")
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
+
+        # Стиль для скруглённых кнопок
+        style = ttk.Style()
+        style.theme_use('clam')
+        style.configure("Rounded.TButton",
+                        font=("Segoe UI", 9, "bold"),
+                        borderwidth=2,
+                        relief="raised",
+                        background="#e0e0e0",
+                        foreground="black",
+                        padding=(10, 5))
+        style.map("Rounded.TButton",
+                  background=[('active', '#d0d0d0'), ('pressed', '#b0b0b0')])
 
         self.model = None
         self.listening = False
@@ -351,54 +364,40 @@ class GigaAMApp:
                                    relief=tk.SUNKEN, borderwidth=2)
         self.phrase_text.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
 
-        # Кнопки
+        # Кнопки (скруглённые, стиль ttk)
         btn_frame = tk.Frame(self.root, bg="#f0f0f0")
         btn_frame.grid(row=1, column=0, sticky="ew", padx=10, pady=(5,10))
         for i in range(5):
             btn_frame.columnconfigure(i, weight=1)
 
-        btn_width = 18   # увеличено до 18 символов
-        def on_enter(btn, color_on): btn.config(background=color_on)
-        def on_leave(btn, color_off): btn.config(background=color_off)
-
-        self.btn_pause = tk.Button(btn_frame, text="⏯ Возобновить (F2)", command=self.toggle_listening,
-                                   bg="#4caf50", fg="white", width=btn_width, font=("Segoe UI", 9, "bold"),
-                                   relief=tk.GROOVE, borderwidth=2, padx=5, pady=2)
-        self.btn_pause.grid(row=0, column=0, padx=4, pady=5)
-        self.btn_pause.bind("<Enter>", lambda e: on_enter(self.btn_pause, "#81c784"))
-        self.btn_pause.bind("<Leave>", lambda e: on_leave(self.btn_pause, "#4caf50"))
+        # Кнопка Возобновить/Пауза
+        self.btn_pause = ttk.Button(btn_frame, text="⏯ Возобновить (F2)", command=self.toggle_listening,
+                                    style="Rounded.TButton")
+        self.btn_pause.grid(row=0, column=0, padx=4, pady=5, sticky="ew")
         ToolTip(self.btn_pause, "Приостановить/возобновить прослушивание")
 
-        self.btn_fix = tk.Button(btn_frame, text="✎ Исправить (F3)", command=self.fix_last_phrase,
-                                 bg="#2196f3", fg="white", width=btn_width, font=("Segoe UI", 9, "bold"),
-                                 relief=tk.GROOVE, borderwidth=2, padx=5, pady=2)
-        self.btn_fix.grid(row=0, column=1, padx=4, pady=5)
-        self.btn_fix.bind("<Enter>", lambda e: on_enter(self.btn_fix, "#64b5f6"))
-        self.btn_fix.bind("<Leave>", lambda e: on_leave(self.btn_fix, "#2196f3"))
+        # Кнопка Исправить
+        self.btn_fix = ttk.Button(btn_frame, text="✎ Исправить (F3)", command=self.fix_last_phrase,
+                                  style="Rounded.TButton")
+        self.btn_fix.grid(row=0, column=1, padx=4, pady=5, sticky="ew")
         ToolTip(self.btn_fix, "Открыть окно для исправления последней фразы")
 
-        self.btn_minimize = tk.Button(btn_frame, text="🗕 Свернуть (F4)", command=self.minimize_window,
-                                      bg="#9e9e9e", fg="white", width=btn_width, font=("Segoe UI", 9, "bold"),
-                                      relief=tk.GROOVE, borderwidth=2, padx=5, pady=2)
-        self.btn_minimize.grid(row=0, column=2, padx=4, pady=5)
-        self.btn_minimize.bind("<Enter>", lambda e: on_enter(self.btn_minimize, "#bdbdbd"))
-        self.btn_minimize.bind("<Leave>", lambda e: on_leave(self.btn_minimize, "#9e9e9e"))
+        # Кнопка Свернуть
+        self.btn_minimize = ttk.Button(btn_frame, text="🗕 Свернуть (F4)", command=self.minimize_window,
+                                       style="Rounded.TButton")
+        self.btn_minimize.grid(row=0, column=2, padx=4, pady=5, sticky="ew")
         ToolTip(self.btn_minimize, "Свернуть окно в панель задач")
 
-        self.btn_update = tk.Button(btn_frame, text="🔄 Обновить", command=self.check_updates,
-                                    bg="#4caf50", fg="white", width=btn_width, font=("Segoe UI", 9, "bold"),
-                                    relief=tk.GROOVE, borderwidth=2, padx=5, pady=2)
-        self.btn_update.grid(row=0, column=3, padx=4, pady=5)
-        self.btn_update.bind("<Enter>", lambda e: on_enter(self.btn_update, "#81c784"))
-        self.btn_update.bind("<Leave>", lambda e: on_leave(self.btn_update, "#4caf50"))
+        # Кнопка Обновить
+        self.btn_update = ttk.Button(btn_frame, text="🔄 Обновить", command=self.check_updates,
+                                     style="Rounded.TButton")
+        self.btn_update.grid(row=0, column=3, padx=4, pady=5, sticky="ew")
         ToolTip(self.btn_update, "Проверить и установить обновления")
 
-        self.btn_about = tk.Button(btn_frame, text="ℹ️ О программе", command=self.show_about,
-                                   bg="#607d8b", fg="white", width=btn_width, font=("Segoe UI", 9, "bold"),
-                                   relief=tk.GROOVE, borderwidth=2, padx=5, pady=2)
-        self.btn_about.grid(row=0, column=4, padx=4, pady=5)
-        self.btn_about.bind("<Enter>", lambda e: on_enter(self.btn_about, "#90a4ae"))
-        self.btn_about.bind("<Leave>", lambda e: on_leave(self.btn_about, "#607d8b"))
+        # Кнопка О программе
+        self.btn_about = ttk.Button(btn_frame, text="ℹ️ О программе", command=self.show_about,
+                                    style="Rounded.TButton")
+        self.btn_about.grid(row=0, column=4, padx=4, pady=5, sticky="ew")
         ToolTip(self.btn_about, "Информация о программе")
 
         keyboard.add_hotkey('F2', self.toggle_listening)
@@ -524,11 +523,11 @@ class GigaAMApp:
         self.listening = not self.listening
         if self.listening:
             self.listening_label.config(text="● СЛУШАЮ", fg="#2e7d32")
-            self.btn_pause.config(text="⏸ Пауза (F2)", bg="#ff9800")
+            self.btn_pause.config(text="⏸ Пауза (F2)")
             self.log("Возобновление работы")
         else:
             self.listening_label.config(text="○ ПАУЗА", fg="#c62828")
-            self.btn_pause.config(text="⏯ Возобновить (F2)", bg="#4caf50")
+            self.btn_pause.config(text="⏯ Возобновить (F2)")
             self.log("Пауза")
 
     def minimize_window(self):
@@ -554,8 +553,8 @@ class GigaAMApp:
         tk.Label(dialog, text="Правильный текст:", bg="#f0f0f0", font=("Segoe UI", 11)).pack()
         correct_entry = tk.Entry(dialog, width=50, font=("Segoe UI", 11))
         correct_entry.pack(pady=5)
-        btn_save = tk.Button(dialog, text="Сохранить", command=lambda: self._save_fix(dialog, correct_entry.get().strip()),
-                             bg="#4caf50", fg="white", width=17, font=("Segoe UI", 10, "bold"))
+        btn_save = ttk.Button(dialog, text="Сохранить", command=lambda: self._save_fix(dialog, correct_entry.get().strip()),
+                              style="Rounded.TButton")
         btn_save.pack(pady=10)
 
     def _save_fix(self, dialog, corr):
@@ -807,6 +806,12 @@ class GigaAMApp:
 # ----------------------------------------------------------------------
 def main():
     root = tk.Tk()
+    # Активация скруглённых углов окна (Windows 11)
+    try:
+        from ctypes import windll
+        windll.dwmapi.DwmSetWindowAttribute(windll.user32.GetParent(root.winfo_id()), 33, 2, 4)
+    except:
+        pass
     app = GigaAMApp(root)
     root.mainloop()
 
