@@ -1,12 +1,12 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-GigaAM Complete — Версия 2.0.28 (19.04.2026)
+GigaAM Complete — Версия 2.0.31 (19.04.2026)
 (c) Боярский Игорь Юрьевич, 2026
 
-- Кнопки вернулись к цветным стилям, одинаковой ширины.
-- Статус «Готов к работе» увеличен и вынесен на видное место.
-- Улучшенная читаемость всех элементов.
+- Увеличен предбуфер до 1.5 с, снижен порог срабатывания.
+- Первое слово больше не обрезается.
+- Геометрия 720x730, все элементы вмещаются.
 """
 
 import sys
@@ -39,7 +39,7 @@ os.environ["ORT_DISABLE_DML"] = "1"
 os.environ["ORT_DISABLE_OPENVINO"] = "1"
 os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
 
-CURRENT_VERSION = "2.0.28"
+CURRENT_VERSION = "2.0.31"
 GITHUB_REPO = "boyarskiyiu/GigaAM-Voice-Typer"
 
 # ----------------------------------------------------------------------
@@ -151,7 +151,7 @@ def get_best_mic():
 # ----------------------------------------------------------------------
 # ЗАЩИТА ОТ ПОВТОРНЫХ ЗАПУСКОВ
 # ----------------------------------------------------------------------
-lock_file = os.path.join(tempfile.gettempdir(), "gigaam_2028.lock")
+lock_file = os.path.join(tempfile.gettempdir(), "gigaam_2031.lock")
 def is_process_running(pid):
     try:
         output = subprocess.check_output(f'tasklist /FI "PID eq {pid}"', shell=True, encoding='cp866')
@@ -215,8 +215,8 @@ class GigaAMApp:
     def __init__(self, root):
         self.root = root
         self.root.title("GigaAM Complete — Голосовой ввод")
-        self.root.geometry("720x700")
-        self.root.minsize(720, 670)
+        self.root.geometry("720x730")
+        self.root.minsize(720, 700)
         self.root.attributes('-topmost', True)
         self.root.configure(bg="#f0f0f0")
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
@@ -226,7 +226,7 @@ class GigaAMApp:
         self.rate = 16000
         self.blocksize = 1024
         self.silence_dur = 0.6
-        self.min_speech_frames = 5
+        self.min_speech_frames = 3        # быстрее срабатывает
         self.threshold = 550
         self.device = None
         self.last_orig = ""
@@ -248,7 +248,7 @@ class GigaAMApp:
         self.speech_counter = 0
         self.end_wait_frames = 0
         self.pre_buffer = []
-        self.pre_max = int(1.1 * self.rate / self.blocksize)
+        self.pre_max = int(1.5 * self.rate / self.blocksize)   # увеличенный предбуфер
 
         self.running = True
         self.task_queue = queue.Queue(maxsize=10)
@@ -284,35 +284,35 @@ class GigaAMApp:
         # Шапка
         header_outer = tk.Frame(top_frame, bg="#f0f0f0", highlightthickness=2, highlightbackground="black")
         header_outer.grid(row=0, column=0, sticky="ew", pady=(0, 5))
-        header = tk.Frame(header_outer, bg="#2c3e50", height=210, relief=tk.RAISED, borderwidth=2)
+        header = tk.Frame(header_outer, bg="#2c3e50", height=220, relief=tk.RAISED, borderwidth=2)
         header.pack(fill=tk.X)
         header.pack_propagate(False)
 
         left = tk.Frame(header, bg="#2c3e50")
-        left.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=12, pady=10)
+        left.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=12, pady=8)
 
         tk.Label(left, text="🎤 GigaAM Complete", font=("Segoe UI", 22, "bold"),
                  bg="#2c3e50", fg="white").pack(anchor="w")
         tk.Label(left, text=f"Версия {CURRENT_VERSION} (19.04.2026)", font=("Segoe UI", 10),
-                 bg="#2c3e50", fg="#bdc3c7").pack(anchor="w", pady=(2,5))
+                 bg="#2c3e50", fg="#bdc3c7").pack(anchor="w", pady=(2,4))
         tk.Label(left, text="Разработчик: Боярский Игорь Юрьевич", font=("Segoe UI", 14, "bold"),
-                 bg="#2c3e50", fg="#f1c40f").pack(anchor="w", pady=(0,5))
+                 bg="#2c3e50", fg="#f1c40f").pack(anchor="w", pady=(0,4))
 
         desc = ("Голос → текст с вставкой в активное окно. Модель GigaAM-v3.\n"
                 "• Автоустановка пакетов, модели, ffmpeg.\n"
                 "• Яндекс.Спеллер исправляет опечатки.\n"
                 "F2 — пауза, F3 — исправить, F4 — свернуть.")
-        tk.Label(left, text=desc, font=("Segoe UI", 10), bg="#2c3e50", fg="#c0d0e0",
-                 justify=tk.LEFT).pack(anchor="w", pady=(0,5))
+        tk.Label(left, text=desc, font=("Segoe UI", 11), bg="#2c3e50", fg="#c0d0e0",
+                 justify=tk.LEFT).pack(anchor="w", pady=(0,4))
         tk.Label(left, text="Микрофон: автоматический выбор. Автокалибровка.",
-                 font=("Segoe UI", 10), bg="#2c3e50", fg="#bdc3c7").pack(anchor="w")
+                 font=("Segoe UI", 11), bg="#2c3e50", fg="#bdc3c7").pack(anchor="w")
 
         right = tk.Frame(header, bg="#2c3e50")
-        right.pack(side=tk.RIGHT, fill=tk.Y, padx=12, pady=10)
+        right.pack(side=tk.RIGHT, fill=tk.Y, padx=12, pady=8)
         tk.Label(right, text="📞 +7 905 570-28-04", font=("Segoe UI", 11),
                  bg="#2c3e50", fg="#ecf0f1").pack(anchor="e")
         tk.Label(right, text="✉️ boyarskiyiu@yandex.ru", font=("Segoe UI", 11),
-                 bg="#2c3e50", fg="#ecf0f1").pack(anchor="e", pady=(5,12))
+                 bg="#2c3e50", fg="#ecf0f1").pack(anchor="e", pady=(4,10))
         tk.Label(right, text="© 2026 Боярский И.Ю.\nВсе права защищены.",
                  font=("Segoe UI", 11, "bold"), bg="#2c3e50", fg="#f1c40f", justify=tk.RIGHT).pack(anchor="e")
 
@@ -320,8 +320,7 @@ class GigaAMApp:
         status_frame = tk.Frame(top_frame, bg="#f0f0f0")
         status_frame.grid(row=1, column=0, sticky="ew", pady=5)
 
-        # Индикатор готовности (увеличенный, справа)
-        self.ready_label = tk.Label(status_frame, text="✅ Готов к работе", font=("Segoe UI", 11, "bold"),
+        self.ready_label = tk.Label(status_frame, text="✅ Готов к работе", font=("Segoe UI", 12, "bold"),
                                     bg="#f0f0f0", fg="#2e7d32")
         self.ready_label.pack(side=tk.RIGHT, padx=(10,0))
 
@@ -341,23 +340,23 @@ class GigaAMApp:
         self.listening_label.pack(side=tk.RIGHT, padx=(15,0))
 
         # Лог
-        log_frame = tk.LabelFrame(top_frame, text="Лог работы", bg="#f0f0f0", font=("Segoe UI", 10))
+        log_frame = tk.LabelFrame(top_frame, text="Лог работы", bg="#f0f0f0", font=("Segoe UI", 11))
         log_frame.grid(row=2, column=0, sticky="nsew", pady=5)
         accent_canvas = tk.Canvas(log_frame, width=3, bg="#f1c40f", highlightthickness=0)
         accent_canvas.pack(side=tk.LEFT, fill=tk.Y, padx=(5,0))
         self.log_text = scrolledtext.ScrolledText(log_frame, wrap=tk.WORD, height=8,
-                                                   bg="#ffffff", fg="#000000", font=("Segoe UI", 10))
+                                                   bg="#ffffff", fg="#000000", font=("Segoe UI", 11))
         self.log_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
-        # Последняя фраза (4 строки)
-        phrase_frame = tk.LabelFrame(top_frame, text="Последняя распознанная фраза", bg="#f0f0f0", font=("Segoe UI", 10))
+        # Последняя фраза (5 строк)
+        phrase_frame = tk.LabelFrame(top_frame, text="Последняя распознанная фраза", bg="#f0f0f0", font=("Segoe UI", 11))
         phrase_frame.grid(row=3, column=0, sticky="ew", pady=5)
-        self.phrase_text = tk.Text(phrase_frame, height=4, wrap=tk.WORD,
+        self.phrase_text = tk.Text(phrase_frame, height=5, wrap=tk.WORD,
                                    bg="#ffffff", fg="#000000", font=("Segoe UI", 11),
                                    relief=tk.SUNKEN, borderwidth=2)
         self.phrase_text.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
 
-        # Кнопки (цветные, одинаковой ширины)
+        # Кнопки
         btn_frame = tk.Frame(self.root, bg="#f0f0f0")
         btn_frame.grid(row=1, column=0, sticky="ew", padx=10, pady=(5,10))
         for i in range(5):
@@ -412,7 +411,7 @@ class GigaAMApp:
         keyboard.add_hotkey('F4', self.minimize_window)
 
     # ------------------------------------------------------------------
-    # Методы распознавания и обновления (без изменений, кроме set_status)
+    # Методы распознавания и обновления
     # ------------------------------------------------------------------
     def compare_versions(self, v1, v2):
         def normalize(v):
@@ -803,13 +802,13 @@ class GigaAMApp:
         text += " "
         try:
             pyperclip.copy(text)
-            time.sleep(0.05)
+            time.sleep(0.01)
             keyboard.press_and_release('ctrl+v')
             self.log("   [Вставка Ctrl+V]")
         except:
             try:
                 import pyautogui
-                pyautogui.write(text, interval=0.02)
+                pyautogui.write(text, interval=0.01)
                 self.log("   [Вставка pyautogui]")
             except:
                 self.log("   ❌ Не удалось вставить")
@@ -819,7 +818,6 @@ class GigaAMApp:
 # ----------------------------------------------------------------------
 def main():
     root = tk.Tk()
-    # Активация скруглённых углов окна (Windows 11)
     try:
         from ctypes import windll
         windll.dwmapi.DwmSetWindowAttribute(windll.user32.GetParent(root.winfo_id()), 33, 2, 4)
