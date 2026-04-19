@@ -1,12 +1,12 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-GigaAM Complete — Версия 2.0.25 (19.04.2026)
+GigaAM Complete — Версия 2.0.26 (19.04.2026)
 (c) Боярский Игорь Юрьевич, 2026
 
-- Увеличены шрифты описания и лога (10 pt).
-- Кнопки с улучшенными иконками и шрифтом 10 pt bold.
-- Потоковая выдача текста (печать по мере накопления речи).
+- Увеличена ширина кнопок (18 символов) и окна (720px).
+- Шрифт кнопок 9.5 pt bold, все шрифты выровнены для читаемости.
+- Компактный, но вместительный интерфейс.
 """
 
 import sys
@@ -39,7 +39,7 @@ os.environ["ORT_DISABLE_DML"] = "1"
 os.environ["ORT_DISABLE_OPENVINO"] = "1"
 os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
 
-CURRENT_VERSION = "2.0.25"
+CURRENT_VERSION = "2.0.26"
 GITHUB_REPO = "boyarskiyiu/GigaAM-Voice-Typer"
 
 # ----------------------------------------------------------------------
@@ -151,7 +151,7 @@ def get_best_mic():
 # ----------------------------------------------------------------------
 # ЗАЩИТА ОТ ПОВТОРНЫХ ЗАПУСКОВ
 # ----------------------------------------------------------------------
-lock_file = os.path.join(tempfile.gettempdir(), "gigaam_2025.lock")
+lock_file = os.path.join(tempfile.gettempdir(), "gigaam_2026.lock")
 def is_process_running(pid):
     try:
         output = subprocess.check_output(f'tasklist /FI "PID eq {pid}"', shell=True, encoding='cp866')
@@ -215,8 +215,8 @@ class GigaAMApp:
     def __init__(self, root):
         self.root = root
         self.root.title("GigaAM Complete — Голосовой ввод")
-        self.root.geometry("700x700")
-        self.root.minsize(700, 670)
+        self.root.geometry("720x700")            # ширина увеличена до 720
+        self.root.minsize(720, 670)
         self.root.attributes('-topmost', True)
         self.root.configure(bg="#f0f0f0")
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
@@ -277,19 +277,19 @@ class GigaAMApp:
         self.root.grid_columnconfigure(0, weight=1)
 
         top_frame = tk.Frame(self.root, bg="#f0f0f0")
-        top_frame.grid(row=0, column=0, sticky="nsew", padx=8, pady=(8, 3))
+        top_frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=(10, 5))
         top_frame.grid_rowconfigure(3, weight=1)
         top_frame.grid_columnconfigure(0, weight=1)
 
         # Шапка
         header_outer = tk.Frame(top_frame, bg="#f0f0f0", highlightthickness=2, highlightbackground="black")
-        header_outer.grid(row=0, column=0, sticky="ew", pady=(0, 3))
+        header_outer.grid(row=0, column=0, sticky="ew", pady=(0, 5))
         header = tk.Frame(header_outer, bg="#2c3e50", height=210, relief=tk.RAISED, borderwidth=2)
         header.pack(fill=tk.X)
         header.pack_propagate(False)
 
         left = tk.Frame(header, bg="#2c3e50")
-        left.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=10, pady=10)
+        left.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=12, pady=10)
 
         tk.Label(left, text="🎤 GigaAM Complete", font=("Segoe UI", 22, "bold"),
                  bg="#2c3e50", fg="white").pack(anchor="w")
@@ -308,7 +308,7 @@ class GigaAMApp:
                  font=("Segoe UI", 10), bg="#2c3e50", fg="#bdc3c7").pack(anchor="w")
 
         right = tk.Frame(header, bg="#2c3e50")
-        right.pack(side=tk.RIGHT, fill=tk.Y, padx=10, pady=10)
+        right.pack(side=tk.RIGHT, fill=tk.Y, padx=12, pady=10)
         tk.Label(right, text="📞 +7 905 570-28-04", font=("Segoe UI", 11),
                  bg="#2c3e50", fg="#ecf0f1").pack(anchor="e")
         tk.Label(right, text="✉️ boyarskiyiu@yandex.ru", font=("Segoe UI", 11),
@@ -318,7 +318,7 @@ class GigaAMApp:
 
         # Статусная строка
         status_frame = tk.Frame(top_frame, bg="#f0f0f0")
-        status_frame.grid(row=1, column=0, sticky="ew", pady=4)
+        status_frame.grid(row=1, column=0, sticky="ew", pady=5)
         self.status_label = tk.Label(status_frame, text="⏳ Инициализация...",
                                      font=("Segoe UI", 10, "bold"), bg="#f0f0f0")
         self.status_label.pack(side=tk.LEFT)
@@ -336,7 +336,7 @@ class GigaAMApp:
 
         # Лог
         log_frame = tk.LabelFrame(top_frame, text="Лог работы", bg="#f0f0f0", font=("Segoe UI", 10))
-        log_frame.grid(row=2, column=0, sticky="nsew", pady=4)
+        log_frame.grid(row=2, column=0, sticky="nsew", pady=5)
         accent_canvas = tk.Canvas(log_frame, width=3, bg="#f1c40f", highlightthickness=0)
         accent_canvas.pack(side=tk.LEFT, fill=tk.Y, padx=(5,0))
         self.log_text = scrolledtext.ScrolledText(log_frame, wrap=tk.WORD, height=8,
@@ -345,7 +345,7 @@ class GigaAMApp:
 
         # Последняя фраза (4 строки)
         phrase_frame = tk.LabelFrame(top_frame, text="Последняя распознанная фраза", bg="#f0f0f0", font=("Segoe UI", 10))
-        phrase_frame.grid(row=3, column=0, sticky="ew", pady=4)
+        phrase_frame.grid(row=3, column=0, sticky="ew", pady=5)
         self.phrase_text = tk.Text(phrase_frame, height=4, wrap=tk.WORD,
                                    bg="#ffffff", fg="#000000", font=("Segoe UI", 11),
                                    relief=tk.SUNKEN, borderwidth=2)
@@ -353,50 +353,50 @@ class GigaAMApp:
 
         # Кнопки
         btn_frame = tk.Frame(self.root, bg="#f0f0f0")
-        btn_frame.grid(row=1, column=0, sticky="ew", padx=8, pady=(3,8))
+        btn_frame.grid(row=1, column=0, sticky="ew", padx=10, pady=(5,10))
         for i in range(5):
             btn_frame.columnconfigure(i, weight=1)
 
-        btn_width = 17
+        btn_width = 18   # увеличено до 18 символов
         def on_enter(btn, color_on): btn.config(background=color_on)
         def on_leave(btn, color_off): btn.config(background=color_off)
 
         self.btn_pause = tk.Button(btn_frame, text="⏯ Возобновить (F2)", command=self.toggle_listening,
-                                   bg="#4caf50", fg="white", width=btn_width, font=("Segoe UI", 10, "bold"),
+                                   bg="#4caf50", fg="white", width=btn_width, font=("Segoe UI", 9, "bold"),
                                    relief=tk.GROOVE, borderwidth=2, padx=5, pady=2)
-        self.btn_pause.grid(row=0, column=0, padx=3, pady=4)
+        self.btn_pause.grid(row=0, column=0, padx=4, pady=5)
         self.btn_pause.bind("<Enter>", lambda e: on_enter(self.btn_pause, "#81c784"))
         self.btn_pause.bind("<Leave>", lambda e: on_leave(self.btn_pause, "#4caf50"))
         ToolTip(self.btn_pause, "Приостановить/возобновить прослушивание")
 
         self.btn_fix = tk.Button(btn_frame, text="✎ Исправить (F3)", command=self.fix_last_phrase,
-                                 bg="#2196f3", fg="white", width=btn_width, font=("Segoe UI", 10, "bold"),
+                                 bg="#2196f3", fg="white", width=btn_width, font=("Segoe UI", 9, "bold"),
                                  relief=tk.GROOVE, borderwidth=2, padx=5, pady=2)
-        self.btn_fix.grid(row=0, column=1, padx=3, pady=4)
+        self.btn_fix.grid(row=0, column=1, padx=4, pady=5)
         self.btn_fix.bind("<Enter>", lambda e: on_enter(self.btn_fix, "#64b5f6"))
         self.btn_fix.bind("<Leave>", lambda e: on_leave(self.btn_fix, "#2196f3"))
         ToolTip(self.btn_fix, "Открыть окно для исправления последней фразы")
 
         self.btn_minimize = tk.Button(btn_frame, text="🗕 Свернуть (F4)", command=self.minimize_window,
-                                      bg="#9e9e9e", fg="white", width=btn_width, font=("Segoe UI", 10, "bold"),
+                                      bg="#9e9e9e", fg="white", width=btn_width, font=("Segoe UI", 9, "bold"),
                                       relief=tk.GROOVE, borderwidth=2, padx=5, pady=2)
-        self.btn_minimize.grid(row=0, column=2, padx=3, pady=4)
+        self.btn_minimize.grid(row=0, column=2, padx=4, pady=5)
         self.btn_minimize.bind("<Enter>", lambda e: on_enter(self.btn_minimize, "#bdbdbd"))
         self.btn_minimize.bind("<Leave>", lambda e: on_leave(self.btn_minimize, "#9e9e9e"))
         ToolTip(self.btn_minimize, "Свернуть окно в панель задач")
 
         self.btn_update = tk.Button(btn_frame, text="🔄 Обновить", command=self.check_updates,
-                                    bg="#4caf50", fg="white", width=btn_width, font=("Segoe UI", 10, "bold"),
+                                    bg="#4caf50", fg="white", width=btn_width, font=("Segoe UI", 9, "bold"),
                                     relief=tk.GROOVE, borderwidth=2, padx=5, pady=2)
-        self.btn_update.grid(row=0, column=3, padx=3, pady=4)
+        self.btn_update.grid(row=0, column=3, padx=4, pady=5)
         self.btn_update.bind("<Enter>", lambda e: on_enter(self.btn_update, "#81c784"))
         self.btn_update.bind("<Leave>", lambda e: on_leave(self.btn_update, "#4caf50"))
         ToolTip(self.btn_update, "Проверить и установить обновления")
 
         self.btn_about = tk.Button(btn_frame, text="ℹ️ О программе", command=self.show_about,
-                                   bg="#607d8b", fg="white", width=btn_width, font=("Segoe UI", 10, "bold"),
+                                   bg="#607d8b", fg="white", width=btn_width, font=("Segoe UI", 9, "bold"),
                                    relief=tk.GROOVE, borderwidth=2, padx=5, pady=2)
-        self.btn_about.grid(row=0, column=4, padx=3, pady=4)
+        self.btn_about.grid(row=0, column=4, padx=4, pady=5)
         self.btn_about.bind("<Enter>", lambda e: on_enter(self.btn_about, "#90a4ae"))
         self.btn_about.bind("<Leave>", lambda e: on_leave(self.btn_about, "#607d8b"))
         ToolTip(self.btn_about, "Информация о программе")
@@ -406,7 +406,7 @@ class GigaAMApp:
         keyboard.add_hotkey('F4', self.minimize_window)
 
     # ------------------------------------------------------------------
-    # Методы распознавания и обновления
+    # Методы распознавания и обновления (без изменений)
     # ------------------------------------------------------------------
     def compare_versions(self, v1, v2):
         def normalize(v):
