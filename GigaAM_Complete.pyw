@@ -1,13 +1,12 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-GigaAM Complete — Версия 2.0.17 (18.04.2026)
+GigaAM Complete — Версия 2.0.25 (19.04.2026)
 (c) Боярский Игорь Юрьевич, 2026
 
-- Кнопки прижаты к низу, лог растягивается при изменении размера окна.
-- Компактный дизайн (760x700), улучшенные иконки на кнопках.
-- Оптимизированные задержки и стабильная работа Яндекс.Спеллера.
-- Автоустановка зависимостей при первом запуске.
+- Увеличены шрифты описания и лога (10 pt).
+- Кнопки с улучшенными иконками и шрифтом 10 pt bold.
+- Потоковая выдача текста (печать по мере накопления речи).
 """
 
 import sys
@@ -27,7 +26,7 @@ from collections import deque
 from datetime import datetime
 
 # ----------------------------------------------------------------------
-# МАКСИМАЛЬНАЯ ОПТИМИЗАЦИЯ ONNX RUNTIME
+# ОПТИМИЗАЦИЯ ONNX RUNTIME
 # ----------------------------------------------------------------------
 cpu_cores = os.cpu_count() or 4
 os.environ["OMP_NUM_THREADS"] = str(cpu_cores)
@@ -40,11 +39,11 @@ os.environ["ORT_DISABLE_DML"] = "1"
 os.environ["ORT_DISABLE_OPENVINO"] = "1"
 os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
 
-CURRENT_VERSION = "2.0.17"
+CURRENT_VERSION = "2.0.25"
 GITHUB_REPO = "boyarskiyiu/GigaAM-Voice-Typer"
 
 # ----------------------------------------------------------------------
-# АВТОУСТАНОВКА ВСЕХ ЗАВИСИМОСТЕЙ (тихая)
+# АВТОУСТАНОВКА ЗАВИСИМОСТЕЙ
 # ----------------------------------------------------------------------
 def install_pip_packages():
     required = [
@@ -84,7 +83,7 @@ install_pip_packages()
 install_ffmpeg()
 
 # ----------------------------------------------------------------------
-# ИМПОРТЫ (кроме tkinter)
+# ИМПОРТЫ ПОСЛЕ УСТАНОВКИ
 # ----------------------------------------------------------------------
 import numpy as np
 import sounddevice as sd
@@ -92,7 +91,6 @@ import keyboard
 import pyperclip
 from scipy.io.wavfile import write as write_wav
 import onnx_asr
-
 np.seterr(all='ignore')
 
 try:
@@ -153,7 +151,7 @@ def get_best_mic():
 # ----------------------------------------------------------------------
 # ЗАЩИТА ОТ ПОВТОРНЫХ ЗАПУСКОВ
 # ----------------------------------------------------------------------
-lock_file = os.path.join(tempfile.gettempdir(), "gigaam_2017.lock")
+lock_file = os.path.join(tempfile.gettempdir(), "gigaam_2025.lock")
 def is_process_running(pid):
     try:
         output = subprocess.check_output(f'tasklist /FI "PID eq {pid}"', shell=True, encoding='cp866')
@@ -170,39 +168,29 @@ if os.path.exists(lock_file):
         else:
             os.unlink(lock_file)
     except:
-        try:
-            os.unlink(lock_file)
-        except:
-            pass
+        os.unlink(lock_file)
 with open(lock_file, 'w') as f:
     f.write(str(os.getpid()))
 atexit.register(lambda: os.path.exists(lock_file) and os.unlink(lock_file))
 
 # ----------------------------------------------------------------------
-# ТОЛЬКО ТЕПЕРЬ ИМПОРТИРУЕМ TKINTER
+# TKINTER И СТИЛИ
 # ----------------------------------------------------------------------
 import tkinter as tk
 from tkinter import scrolledtext, messagebox, ttk
 
-# ----------------------------------------------------------------------
-# КЛАСС TOOLTIP
-# ----------------------------------------------------------------------
 class ToolTip:
     def __init__(self, widget, text):
         self.widget = widget
         self.text = text
         self.tip_window = None
-        self.enter_id = None
         widget.bind('<Enter>', self.schedule_show)
         widget.bind('<Leave>', self.on_leave)
-        widget.bind('<Button-1>', self.on_leave)
 
     def schedule_show(self, event):
-        self.on_leave()
         self.enter_id = self.widget.after(500, self.show_tip)
 
     def show_tip(self):
-        if self.tip_window: return
         x, y, _, _ = self.widget.bbox("insert")
         x += self.widget.winfo_rootx() + 25
         y += self.widget.winfo_rooty() + 25
@@ -210,13 +198,12 @@ class ToolTip:
         tw.wm_overrideredirect(True)
         tw.wm_geometry(f"+{x}+{y}")
         tw.attributes('-topmost', True)
-        tk.Label(tw, text=self.text, justify=tk.LEFT, background="#ffffe0",
-                 relief=tk.SOLID, borderwidth=1, font=("Segoe UI", 9)).pack()
+        tk.Label(tw, text=self.text, background="#ffffe0", relief=tk.SOLID, borderwidth=1,
+                 font=("Segoe UI", 9)).pack()
 
     def on_leave(self, event=None):
-        if self.enter_id:
+        if hasattr(self, 'enter_id'):
             self.widget.after_cancel(self.enter_id)
-            self.enter_id = None
         if self.tip_window:
             self.tip_window.destroy()
             self.tip_window = None
@@ -228,33 +215,18 @@ class GigaAMApp:
     def __init__(self, root):
         self.root = root
         self.root.title("GigaAM Complete — Голосовой ввод")
-        self.root.geometry("760x700")            # компактный размер
-        self.root.minsize(760, 650)
-        self.root.attributes('-topmost', True)   # всегда поверх
+        self.root.geometry("700x700")
+        self.root.minsize(700, 670)
+        self.root.attributes('-topmost', True)
         self.root.configure(bg="#f0f0f0")
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
-
-        # Иконка окна (если есть icon.ico)
-        try:
-            icon_path = os.path.join(os.path.dirname(__file__), "icon.ico")
-            if os.path.exists(icon_path):
-                self.root.iconbitmap(icon_path)
-        except:
-            pass
-
-        # Стили для прогрессбара
-        self.style = ttk.Style()
-        self.style.theme_use('default')
-        self.style.configure("green.Horizontal.TProgressbar", background="#2e7d32", troughcolor="#e0e0e0")
-        self.style.configure("orange.Horizontal.TProgressbar", background="#f57c00", troughcolor="#e0e0e0")
-        self.style.configure("red.Horizontal.TProgressbar", background="#c62828", troughcolor="#e0e0e0")
 
         self.model = None
         self.listening = False
         self.rate = 16000
         self.blocksize = 1024
         self.silence_dur = 0.6
-        self.min_speech_frames = 4
+        self.min_speech_frames = 5
         self.threshold = 550
         self.device = None
         self.last_orig = ""
@@ -276,14 +248,12 @@ class GigaAMApp:
         self.speech_counter = 0
         self.end_wait_frames = 0
         self.pre_buffer = []
-        self.pre_max = int(0.7 * self.rate / self.blocksize)
+        self.pre_max = int(1.1 * self.rate / self.blocksize)
 
         self.running = True
-        self.task_queue = queue.Queue(maxsize=5)
+        self.task_queue = queue.Queue(maxsize=10)
         self.start_worker()
 
-        self.volume_indicator = None
-        self.volume_label = None
         self.volume_history = deque(maxlen=7)
         self._closing = False
 
@@ -302,138 +272,131 @@ class GigaAMApp:
         threading.Thread(target=worker, daemon=True).start()
 
     def create_widgets(self):
-        # Главный контейнер: верхняя часть растягивается, нижняя (кнопки) прижата
-        self.root.grid_rowconfigure(0, weight=1)   # верхний контейнер растягивается
-        self.root.grid_rowconfigure(1, weight=0)   # кнопки не растягиваются
+        self.root.grid_rowconfigure(0, weight=1)
+        self.root.grid_rowconfigure(1, weight=0)
         self.root.grid_columnconfigure(0, weight=1)
 
-        # Верхний контейнер (шапка, статус, лог, фраза)
         top_frame = tk.Frame(self.root, bg="#f0f0f0")
-        top_frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=(10, 5))
-        top_frame.grid_rowconfigure(3, weight=1)   # лог растягивается
+        top_frame.grid(row=0, column=0, sticky="nsew", padx=8, pady=(8, 3))
+        top_frame.grid_rowconfigure(3, weight=1)
         top_frame.grid_columnconfigure(0, weight=1)
 
-        # --- Шапка ---
+        # Шапка
         header_outer = tk.Frame(top_frame, bg="#f0f0f0", highlightthickness=2, highlightbackground="black")
-        header_outer.grid(row=0, column=0, sticky="ew", pady=(0, 5))
-
-        header = tk.Frame(header_outer, bg="#2c3e50", height=230, relief=tk.RAISED, borderwidth=3)
+        header_outer.grid(row=0, column=0, sticky="ew", pady=(0, 3))
+        header = tk.Frame(header_outer, bg="#2c3e50", height=210, relief=tk.RAISED, borderwidth=2)
         header.pack(fill=tk.X)
         header.pack_propagate(False)
 
         left = tk.Frame(header, bg="#2c3e50")
         left.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=10, pady=10)
 
-        tk.Label(left, text="🎤 GigaAM Complete", font=("Segoe UI", 18, "bold"),
-                 bg="#2c3e50", fg="white", anchor="w").pack(fill=tk.X)
-        tk.Label(left, text=f"Версия {CURRENT_VERSION} (18.04.2026)", font=("Segoe UI", 10),
-                 bg="#2c3e50", fg="#bdc3c7", anchor="w").pack(fill=tk.X, pady=(2, 5))
+        tk.Label(left, text="🎤 GigaAM Complete", font=("Segoe UI", 22, "bold"),
+                 bg="#2c3e50", fg="white").pack(anchor="w")
+        tk.Label(left, text=f"Версия {CURRENT_VERSION} (19.04.2026)", font=("Segoe UI", 10),
+                 bg="#2c3e50", fg="#bdc3c7").pack(anchor="w", pady=(2,5))
         tk.Label(left, text="Разработчик: Боярский Игорь Юрьевич", font=("Segoe UI", 14, "bold"),
-                 bg="#2c3e50", fg="#f1c40f", anchor="w").pack(fill=tk.X, pady=(0, 5))
+                 bg="#2c3e50", fg="#f1c40f").pack(anchor="w", pady=(0,5))
 
-        desc_text = (
-            "Голос → текст с вставкой в активное окно. Модель GigaAM-v3.\n"
-            "• Автоустановка пакетов, модели, ffmpeg.\n"
-            "• Яндекс.Спеллер исправляет опечатки и повторы.\n"
-            "F2 — пауза, F3 — исправить, F4 — свернуть."
-        )
-        tk.Label(left, text=desc_text, font=("Segoe UI", 10), bg="#2c3e50", fg="#c0d0e0",
-                 justify=tk.LEFT, anchor="w").pack(fill=tk.X, pady=(0, 5))
-
-        mic_desc = "Микрофон: автоматический выбор. Автокалибровка."
-        tk.Label(left, text=mic_desc, font=("Segoe UI", 10), bg="#2c3e50", fg="#bdc3c7",
-                 justify=tk.LEFT, anchor="w").pack(fill=tk.X, pady=(0, 5))
+        desc = ("Голос → текст с вставкой в активное окно. Модель GigaAM-v3.\n"
+                "• Автоустановка пакетов, модели, ffmpeg.\n"
+                "• Яндекс.Спеллер исправляет опечатки.\n"
+                "F2 — пауза, F3 — исправить, F4 — свернуть.")
+        tk.Label(left, text=desc, font=("Segoe UI", 10), bg="#2c3e50", fg="#c0d0e0",
+                 justify=tk.LEFT).pack(anchor="w", pady=(0,5))
+        tk.Label(left, text="Микрофон: автоматический выбор. Автокалибровка.",
+                 font=("Segoe UI", 10), bg="#2c3e50", fg="#bdc3c7").pack(anchor="w")
 
         right = tk.Frame(header, bg="#2c3e50")
         right.pack(side=tk.RIGHT, fill=tk.Y, padx=10, pady=10)
-
         tk.Label(right, text="📞 +7 905 570-28-04", font=("Segoe UI", 11),
-                 bg="#2c3e50", fg="#ecf0f1", anchor="e").pack(fill=tk.X)
+                 bg="#2c3e50", fg="#ecf0f1").pack(anchor="e")
         tk.Label(right, text="✉️ boyarskiyiu@yandex.ru", font=("Segoe UI", 11),
-                 bg="#2c3e50", fg="#ecf0f1", anchor="e").pack(fill=tk.X, pady=(5, 15))
+                 bg="#2c3e50", fg="#ecf0f1").pack(anchor="e", pady=(5,12))
         tk.Label(right, text="© 2026 Боярский И.Ю.\nВсе права защищены.",
-                 font=("Segoe UI", 11, "bold"), bg="#2c3e50", fg="#f1c40f", justify=tk.RIGHT, anchor="e").pack(fill=tk.X)
+                 font=("Segoe UI", 11, "bold"), bg="#2c3e50", fg="#f1c40f", justify=tk.RIGHT).pack(anchor="e")
 
-        # --- Статусная строка ---
+        # Статусная строка
         status_frame = tk.Frame(top_frame, bg="#f0f0f0")
-        status_frame.grid(row=1, column=0, sticky="ew", pady=5)
-
-        self.status_label = tk.Label(status_frame, text="⏳ Инициализация...", font=("Segoe UI", 10, "bold"), bg="#f0f0f0")
+        status_frame.grid(row=1, column=0, sticky="ew", pady=4)
+        self.status_label = tk.Label(status_frame, text="⏳ Инициализация...",
+                                     font=("Segoe UI", 10, "bold"), bg="#f0f0f0")
         self.status_label.pack(side=tk.LEFT)
 
         vol_frame = tk.Frame(status_frame, bg="#f0f0f0")
         vol_frame.pack(side=tk.RIGHT)
         self.volume_label = tk.Label(vol_frame, text="0%", font=("Segoe UI", 9), bg="#f0f0f0", width=4)
-        self.volume_label.pack(side=tk.RIGHT, padx=(5, 0))
-        self.volume_indicator = ttk.Progressbar(vol_frame, mode='determinate', length=80, maximum=100)
+        self.volume_label.pack(side=tk.RIGHT, padx=(5,0))
+        self.volume_indicator = ttk.Progressbar(vol_frame, mode='determinate', length=70, maximum=100)
         self.volume_indicator.pack(side=tk.RIGHT)
 
         self.listening_label = tk.Label(status_frame, text="○ ПАУЗА", font=("Segoe UI", 10, "bold"),
                                         bg="#f0f0f0", fg="#c62828")
-        self.listening_label.pack(side=tk.RIGHT, padx=(20, 0))
+        self.listening_label.pack(side=tk.RIGHT, padx=(15,0))
 
-        # --- Лог (растягивается) ---
+        # Лог
         log_frame = tk.LabelFrame(top_frame, text="Лог работы", bg="#f0f0f0", font=("Segoe UI", 10))
-        log_frame.grid(row=2, column=0, sticky="nsew", pady=5)
-
+        log_frame.grid(row=2, column=0, sticky="nsew", pady=4)
         accent_canvas = tk.Canvas(log_frame, width=3, bg="#f1c40f", highlightthickness=0)
-        accent_canvas.pack(side=tk.LEFT, fill=tk.Y, padx=(5, 0))
-        self.log_text = scrolledtext.ScrolledText(log_frame, wrap=tk.WORD, height=10,
+        accent_canvas.pack(side=tk.LEFT, fill=tk.Y, padx=(5,0))
+        self.log_text = scrolledtext.ScrolledText(log_frame, wrap=tk.WORD, height=8,
                                                    bg="#ffffff", fg="#000000", font=("Segoe UI", 10))
         self.log_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
-        # --- Последняя фраза ---
+        # Последняя фраза (4 строки)
         phrase_frame = tk.LabelFrame(top_frame, text="Последняя распознанная фраза", bg="#f0f0f0", font=("Segoe UI", 10))
-        phrase_frame.grid(row=3, column=0, sticky="ew", pady=5)
-
-        self.phrase_text = tk.Text(phrase_frame, height=2, wrap=tk.WORD,
+        phrase_frame.grid(row=3, column=0, sticky="ew", pady=4)
+        self.phrase_text = tk.Text(phrase_frame, height=4, wrap=tk.WORD,
                                    bg="#ffffff", fg="#000000", font=("Segoe UI", 11),
                                    relief=tk.SUNKEN, borderwidth=2)
         self.phrase_text.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
 
-        # --- Кнопки (всегда прижаты к низу) ---
+        # Кнопки
         btn_frame = tk.Frame(self.root, bg="#f0f0f0")
-        btn_frame.grid(row=1, column=0, sticky="ew", padx=10, pady=(5, 10))
-
+        btn_frame.grid(row=1, column=0, sticky="ew", padx=8, pady=(3,8))
         for i in range(5):
             btn_frame.columnconfigure(i, weight=1)
 
-        btn_width = 16
-        def on_enter(btn, color_on): btn.config(bg=color_on)
-        def on_leave(btn, color_off): btn.config(bg=color_off)
+        btn_width = 17
+        def on_enter(btn, color_on): btn.config(background=color_on)
+        def on_leave(btn, color_off): btn.config(background=color_off)
 
-        # Кнопки с улучшенными иконками
         self.btn_pause = tk.Button(btn_frame, text="⏯ Возобновить (F2)", command=self.toggle_listening,
-                                   bg="#4caf50", fg="white", width=btn_width, font=("Segoe UI", 10, "bold"))
-        self.btn_pause.grid(row=0, column=0, padx=3, pady=5)
+                                   bg="#4caf50", fg="white", width=btn_width, font=("Segoe UI", 10, "bold"),
+                                   relief=tk.GROOVE, borderwidth=2, padx=5, pady=2)
+        self.btn_pause.grid(row=0, column=0, padx=3, pady=4)
         self.btn_pause.bind("<Enter>", lambda e: on_enter(self.btn_pause, "#81c784"))
         self.btn_pause.bind("<Leave>", lambda e: on_leave(self.btn_pause, "#4caf50"))
-        ToolTip(self.btn_pause, "Приостановить/возобновить прослушивание микрофона")
+        ToolTip(self.btn_pause, "Приостановить/возобновить прослушивание")
 
         self.btn_fix = tk.Button(btn_frame, text="✎ Исправить (F3)", command=self.fix_last_phrase,
-                                 bg="#2196f3", fg="white", width=btn_width, font=("Segoe UI", 10, "bold"))
-        self.btn_fix.grid(row=0, column=1, padx=3, pady=5)
+                                 bg="#2196f3", fg="white", width=btn_width, font=("Segoe UI", 10, "bold"),
+                                 relief=tk.GROOVE, borderwidth=2, padx=5, pady=2)
+        self.btn_fix.grid(row=0, column=1, padx=3, pady=4)
         self.btn_fix.bind("<Enter>", lambda e: on_enter(self.btn_fix, "#64b5f6"))
         self.btn_fix.bind("<Leave>", lambda e: on_leave(self.btn_fix, "#2196f3"))
         ToolTip(self.btn_fix, "Открыть окно для исправления последней фразы")
 
         self.btn_minimize = tk.Button(btn_frame, text="🗕 Свернуть (F4)", command=self.minimize_window,
-                                      bg="#9e9e9e", fg="white", width=btn_width, font=("Segoe UI", 10, "bold"))
-        self.btn_minimize.grid(row=0, column=2, padx=3, pady=5)
+                                      bg="#9e9e9e", fg="white", width=btn_width, font=("Segoe UI", 10, "bold"),
+                                      relief=tk.GROOVE, borderwidth=2, padx=5, pady=2)
+        self.btn_minimize.grid(row=0, column=2, padx=3, pady=4)
         self.btn_minimize.bind("<Enter>", lambda e: on_enter(self.btn_minimize, "#bdbdbd"))
         self.btn_minimize.bind("<Leave>", lambda e: on_leave(self.btn_minimize, "#9e9e9e"))
         ToolTip(self.btn_minimize, "Свернуть окно в панель задач")
 
         self.btn_update = tk.Button(btn_frame, text="🔄 Обновить", command=self.check_updates,
-                                    bg="#4caf50", fg="white", width=btn_width, font=("Segoe UI", 10, "bold"))
-        self.btn_update.grid(row=0, column=3, padx=3, pady=5)
+                                    bg="#4caf50", fg="white", width=btn_width, font=("Segoe UI", 10, "bold"),
+                                    relief=tk.GROOVE, borderwidth=2, padx=5, pady=2)
+        self.btn_update.grid(row=0, column=3, padx=3, pady=4)
         self.btn_update.bind("<Enter>", lambda e: on_enter(self.btn_update, "#81c784"))
         self.btn_update.bind("<Leave>", lambda e: on_leave(self.btn_update, "#4caf50"))
         ToolTip(self.btn_update, "Проверить и установить обновления")
 
         self.btn_about = tk.Button(btn_frame, text="ℹ️ О программе", command=self.show_about,
-                                   bg="#607d8b", fg="white", width=btn_width, font=("Segoe UI", 10, "bold"))
-        self.btn_about.grid(row=0, column=4, padx=3, pady=5)
+                                   bg="#607d8b", fg="white", width=btn_width, font=("Segoe UI", 10, "bold"),
+                                   relief=tk.GROOVE, borderwidth=2, padx=5, pady=2)
+        self.btn_about.grid(row=0, column=4, padx=3, pady=4)
         self.btn_about.bind("<Enter>", lambda e: on_enter(self.btn_about, "#90a4ae"))
         self.btn_about.bind("<Leave>", lambda e: on_leave(self.btn_about, "#607d8b"))
         ToolTip(self.btn_about, "Информация о программе")
@@ -443,7 +406,7 @@ class GigaAMApp:
         keyboard.add_hotkey('F4', self.minimize_window)
 
     # ------------------------------------------------------------------
-    # ОСТАЛЬНЫЕ МЕТОДЫ (без изменений)
+    # Методы распознавания и обновления
     # ------------------------------------------------------------------
     def compare_versions(self, v1, v2):
         def normalize(v):
@@ -504,19 +467,24 @@ class GigaAMApp:
                 assets = latest_release.get("assets", [])
                 download_url = None
                 for asset in assets:
-                    if asset["name"].endswith(".pyw"):
+                    name = asset["name"]
+                    if name.endswith(".pyw") or ".pyw" in name:
                         download_url = asset["browser_download_url"]
                         break
                 if not download_url:
-                    if messagebox.askyesno("Доступно обновление",
-                                           f"Найдена новая версия: {latest_version}.\n"
-                                           "Автоматическая установка невозможна (нет .pyw файла в релизе).\n"
-                                           "Открыть страницу для ручного скачивания?"):
+                    if messagebox.askyesno(
+                        "Доступно обновление",
+                        f"Найдена новая версия: {latest_version}.\n"
+                        "Автоматическая установка невозможна (нет .pyw файла в релизе).\n"
+                        "Открыть страницу для ручного скачивания?"
+                    ):
                         webbrowser.open(f"https://github.com/{GITHUB_REPO}/releases/latest")
                     return
-                if messagebox.askyesno("Доступно обновление",
-                                       f"Найдена новая версия: {latest_version}.\n"
-                                       "Скачать и установить автоматически?"):
+                if messagebox.askyesno(
+                    "Доступно обновление",
+                    f"Найдена новая версия: {latest_version}.\n"
+                    "Скачать и установить автоматически?"
+                ):
                     self.download_and_install_update(download_url)
             else:
                 messagebox.showinfo("Обновлений нет", "У вас установлена последняя версия.")
@@ -772,12 +740,10 @@ class GigaAMApp:
                 write_wav(f.name, self.rate, audio.astype(np.int16))
                 f.flush()
                 raw = self.model.recognize(f.name).strip()
-                for _ in range(3):
-                    try:
-                        os.unlink(f.name)
-                        break
-                    except:
-                        time.sleep(0.2)
+                try:
+                    os.unlink(f.name)
+                except:
+                    pass
             if raw:
                 self.log(f"📝 Распознано: '{raw}'")
                 orig = raw.strip()
@@ -794,7 +760,6 @@ class GigaAMApp:
                 text = normalize_punctuation(text)
                 if text:
                     text = text[0].upper() + text[1:]
-                # --- УЛУЧШЕННЫЙ СПЕЛЛЕР ---
                 if self.speller and text and len(text) > 3:
                     try:
                         if not hasattr(self.speller, 'spelled'):
@@ -803,7 +768,6 @@ class GigaAMApp:
                         self.log(f"🪄 После спеллера: '{text}'")
                     except Exception as e:
                         self.log(f"⚠️ Ошибка спеллера: {e}")
-                # -------------------------
                 if text and text != self.last_final and len(text) > 1:
                     elapsed = time.time() - self.record_start
                     self.log(f"✅ {elapsed:.1f} сек: {text}")

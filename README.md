@@ -1,6 +1,6 @@
 # 🎤 GigaAM Complete — Голосовой ввод с ИИ
 
-![Version](https://img.shields.io/badge/version-2.0.22-blue)
+![Version](https://img.shields.io/badge/version-2.0.25-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-lightgrey)
 
@@ -14,24 +14,23 @@
 - 🪄 Яндекс.Спеллер исправляет опечатки и повторы
 - ⚡ Горячие клавиши: **F2** — пауза/продолжить, **F3** — исправить последнюю фразу, **F4** — свернуть
 - 🌐 Окно всегда поверх других (можно отключить)
-- 🔄 Автообновление с GitHub (проверка и установка новых версий)
-- 📦 Автоустановка всех зависимостей и модели при первом запуске (только для `GigaAM_Complete.pyw`)
+- 🔄 Автообновление с GitHub
+- 📦 Автоустановка зависимостей и модели при первом запуске (только для `GigaAM_Complete.pyw`)
 
 ## 📥 Установка и запуск
 
 ### 🚀 Способ 1: Быстрый запуск (рекомендуется)
 
-1. Скачайте файл `GigaAM_Complete.pyw` из [раздела Releases](https://github.com/boyarskiyiu/GigaAM-Voice-Typer/releases/latest).
-2. Поместите его в любую папку (например, `C:\Users\ВашеИмя\Desktop\GigaAM`).
-3. Запустите двойным щелчком. При первом запуске автоматически установятся все необходимые библиотеки и модель GigaAM (~500 МБ).
+1. Скачайте `GigaAM_Complete.pyw` из [Releases](https://github.com/boyarskiyiu/GigaAM-Voice-Typer/releases/latest).
+2. Запустите двойным щелчком. При первом запуске установятся все библиотеки и модель GigaAM (~500 МБ).
 
-> 💡 Если появляется чёрное окно консоли, создайте ярлык со строкой:  
-> `"C:\Users\ВашеИмя\AppData\Local\Programs\Python\Python311\pythonw.exe" "C:\Users\ВашеИмя\Desktop\GigaAM\GigaAM_Complete.pyw"`
+> 💡 Если появляется консоль, создайте ярлык:  
+> `"путь\к\pythonw.exe" "путь\к\GigaAM_Complete.pyw"`
 
 ### 🛠 Способ 2: Для разработчиков
 
-1. Убедитесь, что установлен Python 3.9–3.11 (рекомендуется 3.11.9).
-2. Клонируйте репозиторий или скачайте `GigaAM_Source.py`.
-3. Установите зависимости:
-   ```bash
-   pip install -r requirements.txt
+```bash
+git clone https://github.com/boyarskiyiu/GigaAM-Voice-Typer
+cd GigaAM-Voice-Typer
+pip install -r requirements.txt
+pythonw GigaAM_Source.py
