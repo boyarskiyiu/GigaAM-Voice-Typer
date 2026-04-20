@@ -1,14 +1,12 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-GigaAM Complete — Версия 2.0.32 (19.04.2026)
+GigaAM Complete — Версия 2.0.33 (20.04.2026)
 (c) Боярский Игорь Юрьевич, 2026
 
-- Добавлен «пинг» аудиопотока для предотвращения его засыпания при длительном простое.
-- Радикально сокращен список стоп-слов, оставлены только междометия и звуки-паразиты.
-- Оптимизированы параметры распознавания для более быстрой выдачи текста.
-- Улучшены настройки Яндекс.Спеллера и обработка его ошибок.
-- Геометрия окна 720x730, все элементы вмещаются.
+- Усилена защита от повторного запуска (исправлен lock-файл + добавлен Windows Mutex).
+- Улучшена работа Яндекс.Спеллера (добавлены параметры: игнорирование цифр, URL, заглавных букв, буквы ё).
+- Исправлены незначительные ошибки и оптимизирован код.
 """
 
 import sys
@@ -28,6 +26,74 @@ from collections import deque
 from datetime import datetime
 
 # ----------------------------------------------------------------------
+# НАДЕЖНАЯ БЛОКИРОВКА ПОВТОРНОГО ЗАПУСКА (Lock-файл + Windows Mutex)
+# ----------------------------------------------------------------------
+LOCK_FILE = os.path.join(tempfile.gettempdir(), "gigaam_2033.lock")
+MUTEX_NAME = "Global\\GigaAMCompleteVoiceTyperMutex_2033"
+
+def is_process_running(pid):
+    """Проверяет, существует ли процесс с указанным PID."""
+    try:
+        # Используем более надежный метод через tasklist
+        output = subprocess.check_output(f'tasklist /FI "PID eq {pid}"', shell=True, encoding='cp866', stderr=subprocess.DEVNULL)
+        return str(pid) in output
+    except Exception:
+        return False
+
+def check_and_set_lock():
+    """Проверяет lock-файл и создает его для текущего процесса."""
+    if os.path.exists(LOCK_FILE):
+        try:
+            with open(LOCK_FILE, 'r') as f:
+                old_pid = int(f.read().strip())
+            if is_process_running(old_pid):
+                print(f"⚠️ Программа уже запущена (PID: {old_pid}). Закрываем текущий экземпляр.")
+                return False
+            else:
+                # Если процесс не найден, значит, это "мертвый" lock-файл
+                print("🧹 Найден устаревший lock-файл. Удаляем.")
+                os.unlink(LOCK_FILE)
+        except (ValueError, FileNotFoundError, ProcessLookupError):
+            os.unlink(LOCK_FILE)  # Файл поврежден, удаляем
+
+    # Записываем PID текущего процесса в новый lock-файл
+    with open(LOCK_FILE, 'w') as f:
+        f.write(str(os.getpid()))
+    # Удаляем файл при завершении программы
+    atexit.register(lambda: os.path.exists(LOCK_FILE) and os.unlink(LOCK_FILE))
+    return True
+
+def check_mutex():
+    """Создает системный мьютекс. Если он уже существует, значит, программа уже запущена."""
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        kernel32 = ctypes.windll.kernel32
+        kernel32.CreateMutexW.argtypes = [wintypes.LPCVOID, wintypes.BOOL, wintypes.LPCWSTR]
+        kernel32.CreateMutexW.restype = wintypes.HANDLE
+        kernel32.GetLastError.restype = wintypes.DWORD
+
+        ERROR_ALREADY_EXISTS = 183
+
+        mutex = kernel32.CreateMutexW(None, False, MUTEX_NAME)
+        if kernel32.GetLastError() == ERROR_ALREADY_EXISTS:
+            if mutex:
+                kernel32.CloseHandle(mutex)
+            print("⚠️ Программа уже запущена (проверка Mutex). Закрываем текущий экземпляр.")
+            return False
+        # Мьютекс будет автоматически освобожден при завершении процесса.
+        return True
+    except Exception as e:
+        print(f"⚠️ Не удалось проверить мьютекс: {e}. Пропускаем эту проверку.")
+        return True  # В случае ошибки пропускаем, чтобы программа могла запуститься
+
+# Комбинированная проверка
+if not check_and_set_lock() or not check_mutex():
+    sys.exit(0)
+# ----------------------------------------------------------------------
+
+# ----------------------------------------------------------------------
 # ОПТИМИЗАЦИЯ ONNX RUNTIME
 # ----------------------------------------------------------------------
 cpu_cores = os.cpu_count() or 4
@@ -41,7 +107,7 @@ os.environ["ORT_DISABLE_DML"] = "1"
 os.environ["ORT_DISABLE_OPENVINO"] = "1"
 os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
 
-CURRENT_VERSION = "2.0.32"
+CURRENT_VERSION = "2.0.33"
 GITHUB_REPO = "boyarskiyiu/GigaAM-Voice-Typer"
 
 # ----------------------------------------------------------------------
@@ -102,7 +168,7 @@ except ImportError:
     SPELLER_AVAILABLE = False
 
 # ----------------------------------------------------------------------
-# ФИЛЬТРЫ ТЕКСТА (оставлены только междометия и паразиты)
+# ФИЛЬТРЫ ТЕКСТА
 # ----------------------------------------------------------------------
 STOP_WORDS = [
     r'э-э+', r'ээ+', r'м-м+', r'мм+', r'ну+', r'вот+', r'короче', r'так сказать',
@@ -147,31 +213,6 @@ def get_best_mic():
         if d['max_input_channels'] > 0 and "microsoft sound mapper" not in d['name'].lower():
             return i
     return None
-
-# ----------------------------------------------------------------------
-# ЗАЩИТА ОТ ПОВТОРНЫХ ЗАПУСКОВ
-# ----------------------------------------------------------------------
-lock_file = os.path.join(tempfile.gettempdir(), "gigaam_2032.lock")
-def is_process_running(pid):
-    try:
-        output = subprocess.check_output(f'tasklist /FI "PID eq {pid}"', shell=True, encoding='cp866')
-        return str(pid) in output
-    except:
-        return False
-if os.path.exists(lock_file):
-    try:
-        with open(lock_file, 'r') as f:
-            old_pid = int(f.read().strip())
-        if is_process_running(old_pid):
-            print("⚠️ Программа уже запущена. Закройте предыдущий экземпляр.")
-            sys.exit(1)
-        else:
-            os.unlink(lock_file)
-    except:
-        os.unlink(lock_file)
-with open(lock_file, 'w') as f:
-    f.write(str(os.getpid()))
-atexit.register(lambda: os.path.exists(lock_file) and os.unlink(lock_file))
 
 # ----------------------------------------------------------------------
 # TKINTER И СТИЛИ
@@ -225,7 +266,7 @@ class GigaAMApp:
         self.listening = False
         self.rate = 16000
         self.blocksize = 1024
-        self.silence_dur = 0.4            # Уменьшено для быстрой реакции
+        self.silence_dur = 0.4
         self.min_speech_frames = 3
         self.threshold = 550
         self.device = None
@@ -233,16 +274,20 @@ class GigaAMApp:
         self.last_final = ""
         self.corr_path = os.path.join(os.path.dirname(__file__), "corrections.json")
 
-        # Настройки Яндекс.Спеллера
+        # УЛУЧШЕННАЯ ИНИЦИАЛИЗАЦИЯ ЯНДЕКС.СПЕЛЛЕРА
         self.speller = None
         if SPELLER_AVAILABLE:
             try:
+                # Параметры подобраны для максимальной точности и стабильности
                 self.speller = YandexSpeller(
                     lang='ru',
                     find_repeat_words=True,
                     ignore_urls=True,
-                    ignore_digits=True
+                    ignore_digits=True,
+                    ignore_capitalization=True,
+                    check_yo=False
                 )
+                self.log_text_initial = "Спеллер инициализирован"
             except Exception as e:
                 print(f"Не удалось инициализировать Яндекс.Спеллер: {e}")
                 self.speller = None
@@ -254,7 +299,7 @@ class GigaAMApp:
         self.speech_counter = 0
         self.end_wait_frames = 0
         self.pre_buffer = []
-        self.pre_max = int(1.5 * self.rate / self.blocksize)  # Увеличенный предбуфер
+        self.pre_max = int(1.5 * self.rate / self.blocksize)
 
         self.running = True
         self.task_queue = queue.Queue(maxsize=10)
@@ -264,17 +309,16 @@ class GigaAMApp:
         self._closing = False
 
         self.create_widgets()
-        self.start_keep_alive_ping()       # Новый механизм пинга
+        self.start_keep_alive_ping()
         threading.Thread(target=self.init_background, daemon=True).start()
 
     def start_keep_alive_ping(self):
         """Периодически отправляет пустой звук в аудиопоток, чтобы он не засыпал."""
         def ping():
             while self.running:
-                time.sleep(10)  # Пинг каждые 10 секунд
+                time.sleep(10)
                 if hasattr(self, 'stream') and self.stream and not self.listening:
                     try:
-                        # Отправляем пустой буфер, чтобы разбудить поток
                         empty_buffer = np.zeros((self.blocksize, 1), dtype=np.int16)
                         self.audio_callback(empty_buffer, self.blocksize, None, None)
                     except:
@@ -314,7 +358,7 @@ class GigaAMApp:
 
         tk.Label(left, text="🎤 GigaAM Complete", font=("Segoe UI", 22, "bold"),
                  bg="#2c3e50", fg="white").pack(anchor="w")
-        tk.Label(left, text=f"Версия {CURRENT_VERSION} (19.04.2026)", font=("Segoe UI", 10),
+        tk.Label(left, text=f"Версия {CURRENT_VERSION} (20.04.2026)", font=("Segoe UI", 10),
                  bg="#2c3e50", fg="#bdc3c7").pack(anchor="w", pady=(2,4))
         tk.Label(left, text="Разработчик: Боярский Игорь Юрьевич", font=("Segoe UI", 14, "bold"),
                  bg="#2c3e50", fg="#f1c40f").pack(anchor="w", pady=(0,4))
@@ -792,11 +836,16 @@ class GigaAMApp:
                 text = normalize_punctuation(text)
                 if text:
                     text = text[0].upper() + text[1:]
-                # Улучшенный Яндекс.Спеллер
+                # УЛУЧШЕННЫЙ ЯНДЕКС.СПЕЛЛЕР
                 if self.speller and text and len(text) > 3:
                     try:
+                        # Повторная инициализация при необходимости
                         if not hasattr(self.speller, 'spelled'):
-                            self.speller = YandexSpeller(lang='ru', find_repeat_words=True)
+                            self.speller = YandexSpeller(
+                                lang='ru', find_repeat_words=True,
+                                ignore_urls=True, ignore_digits=True,
+                                ignore_capitalization=True, check_yo=False
+                            )
                         text = self.speller.spelled(text)
                         self.log(f"🪄 После спеллера: '{text}'")
                     except Exception as e:
