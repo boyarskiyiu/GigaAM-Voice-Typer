@@ -1,97 +1,65 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-GigaAM Complete — Версия 2.0.33 (20.04.2026)
+GigaAM Complete — Версия 2.0.41 (22.04.2026)
 (c) Боярский Игорь Юрьевич, 2026
 
-- Усилена защита от повторного запуска (исправлен lock-файл + добавлен Windows Mutex).
-- Улучшена работа Яндекс.Спеллера (добавлены параметры: игнорирование цифр, URL, заглавных букв, буквы ё).
-- Исправлены незначительные ошибки и оптимизирован код.
+- Отключён режим "поверх всех окон" (topmost).
+- Добавлено "вежливое" поднятие окна на передний план при активации.
+- Усилена защита от повторного запуска.
+- Асинхронная работа Яндекс.Спеллера с таймаутом.
+- Оптимизированная архитектура для предотвращения зависаний.
 """
 
-import sys
-import os
-import subprocess
-import tempfile
-import time
-import json
-import re
-import threading
-import queue
-import atexit
-import shutil
-import requests
-import webbrowser
+import sys, os, subprocess, tempfile, time, json, re, threading, queue, atexit, shutil, requests, webbrowser
 from collections import deque
 from datetime import datetime
+from ctypes import windll
 
 # ----------------------------------------------------------------------
 # НАДЕЖНАЯ БЛОКИРОВКА ПОВТОРНОГО ЗАПУСКА (Lock-файл + Windows Mutex)
 # ----------------------------------------------------------------------
-LOCK_FILE = os.path.join(tempfile.gettempdir(), "gigaam_2033.lock")
-MUTEX_NAME = "Global\\GigaAMCompleteVoiceTyperMutex_2033"
+LOCK_FILE = os.path.join(tempfile.gettempdir(), "gigaam_2041.lock")
+MUTEX_NAME = "Global\\GigaAMCompleteVoiceTyperMutex_2041"
 
 def is_process_running(pid):
-    """Проверяет, существует ли процесс с указанным PID."""
     try:
-        # Используем более надежный метод через tasklist
         output = subprocess.check_output(f'tasklist /FI "PID eq {pid}"', shell=True, encoding='cp866', stderr=subprocess.DEVNULL)
         return str(pid) in output
-    except Exception:
-        return False
+    except Exception: return False
 
 def check_and_set_lock():
-    """Проверяет lock-файл и создает его для текущего процесса."""
     if os.path.exists(LOCK_FILE):
         try:
-            with open(LOCK_FILE, 'r') as f:
-                old_pid = int(f.read().strip())
+            with open(LOCK_FILE, 'r') as f: old_pid = int(f.read().strip())
             if is_process_running(old_pid):
                 print(f"⚠️ Программа уже запущена (PID: {old_pid}). Закрываем текущий экземпляр.")
                 return False
-            else:
-                # Если процесс не найден, значит, это "мертвый" lock-файл
-                print("🧹 Найден устаревший lock-файл. Удаляем.")
-                os.unlink(LOCK_FILE)
-        except (ValueError, FileNotFoundError, ProcessLookupError):
-            os.unlink(LOCK_FILE)  # Файл поврежден, удаляем
-
-    # Записываем PID текущего процесса в новый lock-файл
-    with open(LOCK_FILE, 'w') as f:
-        f.write(str(os.getpid()))
-    # Удаляем файл при завершении программы
+            else: os.unlink(LOCK_FILE)
+        except: os.unlink(LOCK_FILE)
+    with open(LOCK_FILE, 'w') as f: f.write(str(os.getpid()))
     atexit.register(lambda: os.path.exists(LOCK_FILE) and os.unlink(LOCK_FILE))
     return True
 
 def check_mutex():
-    """Создает системный мьютекс. Если он уже существует, значит, программа уже запущена."""
     try:
         import ctypes
         from ctypes import wintypes
-
         kernel32 = ctypes.windll.kernel32
         kernel32.CreateMutexW.argtypes = [wintypes.LPCVOID, wintypes.BOOL, wintypes.LPCWSTR]
         kernel32.CreateMutexW.restype = wintypes.HANDLE
         kernel32.GetLastError.restype = wintypes.DWORD
-
-        ERROR_ALREADY_EXISTS = 183
-
         mutex = kernel32.CreateMutexW(None, False, MUTEX_NAME)
-        if kernel32.GetLastError() == ERROR_ALREADY_EXISTS:
-            if mutex:
-                kernel32.CloseHandle(mutex)
+        if kernel32.GetLastError() == 183:
+            if mutex: kernel32.CloseHandle(mutex)
             print("⚠️ Программа уже запущена (проверка Mutex). Закрываем текущий экземпляр.")
             return False
-        # Мьютекс будет автоматически освобожден при завершении процесса.
         return True
     except Exception as e:
-        print(f"⚠️ Не удалось проверить мьютекс: {e}. Пропускаем эту проверку.")
-        return True  # В случае ошибки пропускаем, чтобы программа могла запуститься
+        print(f"⚠️ Не удалось проверить мьютекс: {e}. Пропускаем.")
+        return True
 
-# Комбинированная проверка
-if not check_and_set_lock() or not check_mutex():
-    sys.exit(0)
-# ----------------------------------------------------------------------
+if not check_and_set_lock() or not check_mutex(): sys.exit(0)
 
 # ----------------------------------------------------------------------
 # ОПТИМИЗАЦИЯ ONNX RUNTIME
@@ -107,31 +75,23 @@ os.environ["ORT_DISABLE_DML"] = "1"
 os.environ["ORT_DISABLE_OPENVINO"] = "1"
 os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
 
-CURRENT_VERSION = "2.0.33"
+CURRENT_VERSION = "2.0.41"
 GITHUB_REPO = "boyarskiyiu/GigaAM-Voice-Typer"
 
 # ----------------------------------------------------------------------
 # АВТОУСТАНОВКА ЗАВИСИМОСТЕЙ
 # ----------------------------------------------------------------------
 def install_pip_packages():
-    required = [
-        "onnxruntime", "onnx", "onnx-asr[cpu,hub]", "sounddevice",
-        "numpy", "keyboard", "scipy", "pyperclip", "librosa",
-        "pyautogui", "pillow", "pyaspeller", "requests"
-    ]
+    required = ["onnxruntime", "onnx", "onnx-asr[cpu,hub]", "sounddevice", "numpy", "keyboard", "scipy", "pyperclip", "librosa", "pyautogui", "pillow", "pyaspeller", "requests"]
     missing = []
     for pkg in required:
         pkg_name = pkg.replace("[cpu,hub]", "").replace("-", "_")
         if pkg_name == "pillow": pkg_name = "PIL"
         if pkg_name == "pyaspeller": pkg_name = "pyaspeller"
-        try:
-            __import__(pkg_name)
-        except ImportError:
-            missing.append(pkg)
+        try: __import__(pkg_name)
+        except ImportError: missing.append(pkg)
     if missing:
-        for pkg in missing:
-            subprocess.run([sys.executable, "-m", "pip", "install", pkg, "--quiet", "--no-warn-script-location"],
-                           capture_output=True, check=False)
+        for pkg in missing: subprocess.run([sys.executable, "-m", "pip", "install", pkg, "--quiet", "--no-warn-script-location"], capture_output=True, check=False)
 
 def install_ffmpeg():
     if shutil.which("ffmpeg") is None:
@@ -139,13 +99,11 @@ def install_ffmpeg():
             import static_ffmpeg
             static_ffmpeg.add_paths()
         except ImportError:
-            subprocess.run([sys.executable, "-m", "pip", "install", "static-ffmpeg", "--quiet", "--no-warn-script-location"],
-                           capture_output=True, check=False)
+            subprocess.run([sys.executable, "-m", "pip", "install", "static-ffmpeg", "--quiet", "--no-warn-script-location"], capture_output=True, check=False)
             try:
                 import static_ffmpeg
                 static_ffmpeg.add_paths()
-            except:
-                pass
+            except: pass
 
 install_pip_packages()
 install_ffmpeg()
@@ -170,28 +128,18 @@ except ImportError:
 # ----------------------------------------------------------------------
 # ФИЛЬТРЫ ТЕКСТА
 # ----------------------------------------------------------------------
-STOP_WORDS = [
-    r'э-э+', r'ээ+', r'м-м+', r'мм+', r'ну+', r'вот+', r'короче', r'так сказать',
-    r'как бы', r'типа', r'это самое', r'в общем', r'нуу', r'честно говоря',
-    r'собственно', r'понимаешь', r'понимаете', r'видите ли', r'знаешь', r'знаете',
-    r'ладно', r'допустим', r'скажем', r'пожалуй', r'наверное', r'конкретно',
-    r'например', r'кстати', r'во-первых', r'во-вторых', r'кажется', r'типа того',
-    r'как-то', r'вообще-то', r'собственно говоря', r'по сути', r'в принципе',
-    r'естественно', r'безусловно', r'конечно', r'слышь', r'слышишь'
-]
+STOP_WORDS = [r'э-э+', r'ээ+', r'м-м+', r'мм+', r'ну+', r'вот+', r'короче', r'так сказать', r'как бы', r'типа', r'это самое', r'в общем', r'нуу', r'честно говоря', r'собственно', r'понимаешь', r'понимаете', r'видите ли', r'знаешь', r'знаете', r'ладно', r'допустим', r'скажем', r'пожалуй', r'наверное', r'конкретно', r'например', r'кстати', r'во-первых', r'во-вторых', r'кажется', r'типа того', r'как-то', r'вообще-то', r'собственно говоря', r'по сути', r'в принципе', r'естественно', r'безусловно', r'конечно', r'слышь', r'слышишь']
 STOP_WORDS_PATTERN = '|'.join([rf'\b({w})\b' for w in STOP_WORDS])
 STOP_WORDS_REGEX = re.compile(STOP_WORDS_PATTERN, re.IGNORECASE)
 
 def clean_text(text):
     if not text: return ""
     text = STOP_WORDS_REGEX.sub('', text)
-    text = re.sub(r'\s+', ' ', text).strip()
-    return text
+    return re.sub(r'\s+', ' ', text).strip()
 
 def remove_leading_punctuation(text):
     if not text: return text
-    text = re.sub(r'^[^\w\s]+', '', text)
-    return text.lstrip()
+    return re.sub(r'^[^\w\s]+', '', text).lstrip()
 
 def normalize_punctuation(text):
     if not text: return text
@@ -200,37 +148,27 @@ def normalize_punctuation(text):
     text = re.sub(r',+$', '', text)
     text = re.sub(r',\s*\.', '.', text)
     text = re.sub(r'\.{2,}', '.', text)
-    if text and text[-1] not in '.!?':
-        text += '.'
+    if text and text[-1] not in '.!?': text += '.'
     return text
 
 # ----------------------------------------------------------------------
-# МИКРОФОН (АВТОМАТИЧЕСКИЙ ВЫБОР)
+# МИКРОФОН
 # ----------------------------------------------------------------------
-def get_best_mic():
-    devices = sd.query_devices()
-    for i, d in enumerate(devices):
-        if d['max_input_channels'] > 0 and "microsoft sound mapper" not in d['name'].lower():
-            return i
-    return None
+def get_best_mic(): return None
 
 # ----------------------------------------------------------------------
-# TKINTER И СТИЛИ
+# TKINTER
 # ----------------------------------------------------------------------
 import tkinter as tk
 from tkinter import scrolledtext, messagebox, ttk
 
 class ToolTip:
     def __init__(self, widget, text):
-        self.widget = widget
-        self.text = text
-        self.tip_window = None
+        self.widget, self.text, self.tip_window = widget, text, None
         widget.bind('<Enter>', self.schedule_show)
         widget.bind('<Leave>', self.on_leave)
-
     def schedule_show(self, event):
         self.enter_id = self.widget.after(500, self.show_tip)
-
     def show_tip(self):
         x, y, _, _ = self.widget.bbox("insert")
         x += self.widget.winfo_rootx() + 25
@@ -239,15 +177,10 @@ class ToolTip:
         tw.wm_overrideredirect(True)
         tw.wm_geometry(f"+{x}+{y}")
         tw.attributes('-topmost', True)
-        tk.Label(tw, text=self.text, background="#ffffe0", relief=tk.SOLID, borderwidth=1,
-                 font=("Segoe UI", 9)).pack()
-
+        tk.Label(tw, text=self.text, background="#ffffe0", relief=tk.SOLID, borderwidth=1, font=("Segoe UI", 9)).pack()
     def on_leave(self, event=None):
-        if hasattr(self, 'enter_id'):
-            self.widget.after_cancel(self.enter_id)
-        if self.tip_window:
-            self.tip_window.destroy()
-            self.tip_window = None
+        if hasattr(self, 'enter_id'): self.widget.after_cancel(self.enter_id)
+        if self.tip_window: self.tip_window.destroy(); self.tip_window = None
 
 # ----------------------------------------------------------------------
 # ОСНОВНОЙ КЛАСС
@@ -258,7 +191,8 @@ class GigaAMApp:
         self.root.title("GigaAM Complete — Голосовой ввод")
         self.root.geometry("720x730")
         self.root.minsize(720, 700)
-        self.root.attributes('-topmost', True)
+        # --- ОТКЛЮЧАЕМ TOPMOST ---
+        # self.root.attributes('-topmost', True)
         self.root.configure(bg="#f0f0f0")
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
 
@@ -268,29 +202,17 @@ class GigaAMApp:
         self.blocksize = 1024
         self.silence_dur = 0.4
         self.min_speech_frames = 3
-        self.threshold = 550
-        self.device = None
+        self.threshold = 120
+        self.device = get_best_mic()
         self.last_orig = ""
         self.last_final = ""
         self.corr_path = os.path.join(os.path.dirname(__file__), "corrections.json")
 
-        # УЛУЧШЕННАЯ ИНИЦИАЛИЗАЦИЯ ЯНДЕКС.СПЕЛЛЕРА
         self.speller = None
         if SPELLER_AVAILABLE:
             try:
-                # Параметры подобраны для максимальной точности и стабильности
-                self.speller = YandexSpeller(
-                    lang='ru',
-                    find_repeat_words=True,
-                    ignore_urls=True,
-                    ignore_digits=True,
-                    ignore_capitalization=True,
-                    check_yo=False
-                )
-                self.log_text_initial = "Спеллер инициализирован"
-            except Exception as e:
-                print(f"Не удалось инициализировать Яндекс.Спеллер: {e}")
-                self.speller = None
+                self.speller = YandexSpeller(lang='ru', find_repeat_words=True, ignore_urls=True, ignore_digits=True, ignore_capitalization=True, check_yo=False)
+            except Exception: self.speller = None
 
         self.silent_frames = 0
         self.recording = False
@@ -310,10 +232,35 @@ class GigaAMApp:
 
         self.create_widgets()
         self.start_keep_alive_ping()
+        self.start_hotkey_refresher()
         threading.Thread(target=self.init_background, daemon=True).start()
+        # Поднимаем окно на передний план при старте
+        self.root.after(100, self.lift_and_focus)
+
+    def lift_and_focus(self):
+        """Вежливо поднимает окно на передний план, не делая его поверх всех навсегда."""
+        try:
+            self.root.lift()
+            self.root.focus_force()
+        except Exception: pass
+
+    def start_hotkey_refresher(self):
+        """Каждые 30 секунд перерегистрирует горячие клавиши, чтобы избежать их потери после сна."""
+        def refresher():
+            while self.running:
+                time.sleep(30)
+                try:
+                    keyboard.unhook_all_hotkeys()
+                    with keyboard._pressed_events_lock: keyboard._pressed_events.clear()
+                    keyboard._listener.active_modifiers.clear()
+                    keyboard._logically_pressed_keys.clear()
+                    keyboard.add_hotkey('F2', self.toggle_listening)
+                    keyboard.add_hotkey('F3', self.fix_last_phrase)
+                    keyboard.add_hotkey('F4', self.minimize_window)
+                except: pass
+        threading.Thread(target=refresher, daemon=True).start()
 
     def start_keep_alive_ping(self):
-        """Периодически отправляет пустой звук в аудиопоток, чтобы он не засыпал."""
         def ping():
             while self.running:
                 time.sleep(10)
@@ -321,8 +268,7 @@ class GigaAMApp:
                     try:
                         empty_buffer = np.zeros((self.blocksize, 1), dtype=np.int16)
                         self.audio_callback(empty_buffer, self.blocksize, None, None)
-                    except:
-                        pass
+                    except: pass
         threading.Thread(target=ping, daemon=True).start()
 
     def start_worker(self):
@@ -332,8 +278,7 @@ class GigaAMApp:
                     audio = self.task_queue.get(timeout=0.5)
                     if audio is None: continue
                     self._recognize_and_paste(audio)
-                except queue.Empty:
-                    continue
+                except queue.Empty: continue
         threading.Thread(target=worker, daemon=True).start()
 
     def create_widgets(self):
@@ -350,47 +295,33 @@ class GigaAMApp:
         header_outer = tk.Frame(top_frame, bg="#f0f0f0", highlightthickness=2, highlightbackground="black")
         header_outer.grid(row=0, column=0, sticky="ew", pady=(0, 5))
         header = tk.Frame(header_outer, bg="#2c3e50", height=220, relief=tk.RAISED, borderwidth=2)
-        header.pack(fill=tk.X)
-        header.pack_propagate(False)
+        header.pack(fill=tk.X); header.pack_propagate(False)
 
         left = tk.Frame(header, bg="#2c3e50")
         left.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=12, pady=8)
 
-        tk.Label(left, text="🎤 GigaAM Complete", font=("Segoe UI", 22, "bold"),
-                 bg="#2c3e50", fg="white").pack(anchor="w")
-        tk.Label(left, text=f"Версия {CURRENT_VERSION} (20.04.2026)", font=("Segoe UI", 10),
-                 bg="#2c3e50", fg="#bdc3c7").pack(anchor="w", pady=(2,4))
-        tk.Label(left, text="Разработчик: Боярский Игорь Юрьевич", font=("Segoe UI", 14, "bold"),
-                 bg="#2c3e50", fg="#f1c40f").pack(anchor="w", pady=(0,4))
+        tk.Label(left, text="🎤 GigaAM Complete", font=("Segoe UI", 22, "bold"), bg="#2c3e50", fg="white").pack(anchor="w")
+        tk.Label(left, text=f"Версия {CURRENT_VERSION} (22.04.2026)", font=("Segoe UI", 10), bg="#2c3e50", fg="#bdc3c7").pack(anchor="w", pady=(2,4))
+        tk.Label(left, text="Разработчик: Боярский Игорь Юрьевич", font=("Segoe UI", 14, "bold"), bg="#2c3e50", fg="#f1c40f").pack(anchor="w", pady=(0,4))
 
-        desc = ("Голос → текст с вставкой в активное окно. Модель GigaAM-v3.\n"
-                "• Автоустановка пакетов, модели, ffmpeg.\n"
-                "• Яндекс.Спеллер исправляет опечатки.\n"
-                "F2 — пауза, F3 — исправить, F4 — свернуть.")
-        tk.Label(left, text=desc, font=("Segoe UI", 11), bg="#2c3e50", fg="#c0d0e0",
-                 justify=tk.LEFT).pack(anchor="w", pady=(0,4))
-        tk.Label(left, text="Микрофон: автоматический выбор. Автокалибровка.",
-                 font=("Segoe UI", 11), bg="#2c3e50", fg="#bdc3c7").pack(anchor="w")
+        desc = ("Голос → текст с вставкой в активное окно. Модель GigaAM-v3.\n• Автоустановка пакетов, модели, ffmpeg.\n• Яндекс.Спеллер исправляет опечатки.\nF2 — пауза, F3 — исправить, F4 — свернуть.")
+        tk.Label(left, text=desc, font=("Segoe UI", 11), bg="#2c3e50", fg="#c0d0e0", justify=tk.LEFT).pack(anchor="w", pady=(0,4))
+        tk.Label(left, text="Микрофон: системный по умолчанию. Порог: 120.", font=("Segoe UI", 11), bg="#2c3e50", fg="#bdc3c7").pack(anchor="w")
 
         right = tk.Frame(header, bg="#2c3e50")
         right.pack(side=tk.RIGHT, fill=tk.Y, padx=12, pady=8)
-        tk.Label(right, text="📞 +7 905 570-28-04", font=("Segoe UI", 11),
-                 bg="#2c3e50", fg="#ecf0f1").pack(anchor="e")
-        tk.Label(right, text="✉️ boyarskiyiu@yandex.ru", font=("Segoe UI", 11),
-                 bg="#2c3e50", fg="#ecf0f1").pack(anchor="e", pady=(4,10))
-        tk.Label(right, text="© 2026 Боярский И.Ю.\nВсе права защищены.",
-                 font=("Segoe UI", 11, "bold"), bg="#2c3e50", fg="#f1c40f", justify=tk.RIGHT).pack(anchor="e")
+        tk.Label(right, text="📞 +7 905 570-28-04", font=("Segoe UI", 11), bg="#2c3e50", fg="#ecf0f1").pack(anchor="e")
+        tk.Label(right, text="✉️ boyarskiyiu@yandex.ru", font=("Segoe UI", 11), bg="#2c3e50", fg="#ecf0f1").pack(anchor="e", pady=(4,10))
+        tk.Label(right, text="© 2026 Боярский И.Ю.\nВсе права защищены.", font=("Segoe UI", 11, "bold"), bg="#2c3e50", fg="#f1c40f", justify=tk.RIGHT).pack(anchor="e")
 
         # Статусная строка
         status_frame = tk.Frame(top_frame, bg="#f0f0f0")
         status_frame.grid(row=1, column=0, sticky="ew", pady=5)
 
-        self.ready_label = tk.Label(status_frame, text="✅ Готов к работе", font=("Segoe UI", 12, "bold"),
-                                    bg="#f0f0f0", fg="#2e7d32")
+        self.ready_label = tk.Label(status_frame, text="✅ Готов к работе", font=("Segoe UI", 12, "bold"), bg="#f0f0f0", fg="#2e7d32")
         self.ready_label.pack(side=tk.RIGHT, padx=(10,0))
 
-        self.status_label = tk.Label(status_frame, text="⏳ Инициализация...",
-                                     font=("Segoe UI", 10, "bold"), bg="#f0f0f0")
+        self.status_label = tk.Label(status_frame, text="⏳ Инициализация...", font=("Segoe UI", 10, "bold"), bg="#f0f0f0")
         self.status_label.pack(side=tk.LEFT)
 
         vol_frame = tk.Frame(status_frame, bg="#f0f0f0")
@@ -400,8 +331,7 @@ class GigaAMApp:
         self.volume_indicator = ttk.Progressbar(vol_frame, mode='determinate', length=70, maximum=100)
         self.volume_indicator.pack(side=tk.RIGHT)
 
-        self.listening_label = tk.Label(status_frame, text="○ ПАУЗА", font=("Segoe UI", 10, "bold"),
-                                        bg="#f0f0f0", fg="#c62828")
+        self.listening_label = tk.Label(status_frame, text="○ ПАУЗА", font=("Segoe UI", 10, "bold"), bg="#f0f0f0", fg="#c62828")
         self.listening_label.pack(side=tk.RIGHT, padx=(15,0))
 
         # Лог
@@ -409,66 +339,47 @@ class GigaAMApp:
         log_frame.grid(row=2, column=0, sticky="nsew", pady=5)
         accent_canvas = tk.Canvas(log_frame, width=3, bg="#f1c40f", highlightthickness=0)
         accent_canvas.pack(side=tk.LEFT, fill=tk.Y, padx=(5,0))
-        self.log_text = scrolledtext.ScrolledText(log_frame, wrap=tk.WORD, height=8,
-                                                   bg="#ffffff", fg="#000000", font=("Segoe UI", 11))
+        self.log_text = scrolledtext.ScrolledText(log_frame, wrap=tk.WORD, height=8, bg="#ffffff", fg="#000000", font=("Segoe UI", 11))
         self.log_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
-        # Последняя фраза (5 строк)
+        # Последняя фраза
         phrase_frame = tk.LabelFrame(top_frame, text="Последняя распознанная фраза", bg="#f0f0f0", font=("Segoe UI", 11))
         phrase_frame.grid(row=3, column=0, sticky="ew", pady=5)
-        self.phrase_text = tk.Text(phrase_frame, height=5, wrap=tk.WORD,
-                                   bg="#ffffff", fg="#000000", font=("Segoe UI", 11),
-                                   relief=tk.SUNKEN, borderwidth=2)
+        self.phrase_text = tk.Text(phrase_frame, height=5, wrap=tk.WORD, bg="#ffffff", fg="#000000", font=("Segoe UI", 11), relief=tk.SUNKEN, borderwidth=2)
         self.phrase_text.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
 
         # Кнопки
         btn_frame = tk.Frame(self.root, bg="#f0f0f0")
         btn_frame.grid(row=1, column=0, sticky="ew", padx=10, pady=(5,10))
-        for i in range(5):
-            btn_frame.columnconfigure(i, weight=1)
+        for i in range(5): btn_frame.columnconfigure(i, weight=1)
 
         btn_width = 18
         def on_enter(btn, color_on): btn.config(background=color_on)
         def on_leave(btn, color_off): btn.config(background=color_off)
 
-        self.btn_pause = tk.Button(btn_frame, text="⏯ Возобновить (F2)", command=self.toggle_listening,
-                                   bg="#4caf50", fg="white", width=btn_width, font=("Segoe UI", 9, "bold"),
-                                   relief=tk.GROOVE, borderwidth=2, padx=5, pady=2)
+        self.btn_pause = tk.Button(btn_frame, text="⏯ Возобновить (F2)", command=self.toggle_listening, bg="#4caf50", fg="white", width=btn_width, font=("Segoe UI", 9, "bold"), relief=tk.GROOVE, borderwidth=2, padx=5, pady=2)
         self.btn_pause.grid(row=0, column=0, padx=4, pady=5)
-        self.btn_pause.bind("<Enter>", lambda e: on_enter(self.btn_pause, "#81c784"))
-        self.btn_pause.bind("<Leave>", lambda e: on_leave(self.btn_pause, "#4caf50"))
+        self.btn_pause.bind("<Enter>", lambda e: on_enter(self.btn_pause, "#81c784")); self.btn_pause.bind("<Leave>", lambda e: on_leave(self.btn_pause, "#4caf50"))
         ToolTip(self.btn_pause, "Приостановить/возобновить прослушивание")
 
-        self.btn_fix = tk.Button(btn_frame, text="✎ Исправить (F3)", command=self.fix_last_phrase,
-                                 bg="#2196f3", fg="white", width=btn_width, font=("Segoe UI", 9, "bold"),
-                                 relief=tk.GROOVE, borderwidth=2, padx=5, pady=2)
+        self.btn_fix = tk.Button(btn_frame, text="✎ Исправить (F3)", command=self.fix_last_phrase, bg="#2196f3", fg="white", width=btn_width, font=("Segoe UI", 9, "bold"), relief=tk.GROOVE, borderwidth=2, padx=5, pady=2)
         self.btn_fix.grid(row=0, column=1, padx=4, pady=5)
-        self.btn_fix.bind("<Enter>", lambda e: on_enter(self.btn_fix, "#64b5f6"))
-        self.btn_fix.bind("<Leave>", lambda e: on_leave(self.btn_fix, "#2196f3"))
+        self.btn_fix.bind("<Enter>", lambda e: on_enter(self.btn_fix, "#64b5f6")); self.btn_fix.bind("<Leave>", lambda e: on_leave(self.btn_fix, "#2196f3"))
         ToolTip(self.btn_fix, "Открыть окно для исправления последней фразы")
 
-        self.btn_minimize = tk.Button(btn_frame, text="🗕 Свернуть (F4)", command=self.minimize_window,
-                                      bg="#9e9e9e", fg="white", width=btn_width, font=("Segoe UI", 9, "bold"),
-                                      relief=tk.GROOVE, borderwidth=2, padx=5, pady=2)
+        self.btn_minimize = tk.Button(btn_frame, text="🗕 Свернуть (F4)", command=self.minimize_window, bg="#9e9e9e", fg="white", width=btn_width, font=("Segoe UI", 9, "bold"), relief=tk.GROOVE, borderwidth=2, padx=5, pady=2)
         self.btn_minimize.grid(row=0, column=2, padx=4, pady=5)
-        self.btn_minimize.bind("<Enter>", lambda e: on_enter(self.btn_minimize, "#bdbdbd"))
-        self.btn_minimize.bind("<Leave>", lambda e: on_leave(self.btn_minimize, "#9e9e9e"))
+        self.btn_minimize.bind("<Enter>", lambda e: on_enter(self.btn_minimize, "#bdbdbd")); self.btn_minimize.bind("<Leave>", lambda e: on_leave(self.btn_minimize, "#9e9e9e"))
         ToolTip(self.btn_minimize, "Свернуть окно в панель задач")
 
-        self.btn_update = tk.Button(btn_frame, text="🔄 Обновить", command=self.check_updates,
-                                    bg="#4caf50", fg="white", width=btn_width, font=("Segoe UI", 9, "bold"),
-                                    relief=tk.GROOVE, borderwidth=2, padx=5, pady=2)
+        self.btn_update = tk.Button(btn_frame, text="🔄 Обновить", command=self.check_updates, bg="#4caf50", fg="white", width=btn_width, font=("Segoe UI", 9, "bold"), relief=tk.GROOVE, borderwidth=2, padx=5, pady=2)
         self.btn_update.grid(row=0, column=3, padx=4, pady=5)
-        self.btn_update.bind("<Enter>", lambda e: on_enter(self.btn_update, "#81c784"))
-        self.btn_update.bind("<Leave>", lambda e: on_leave(self.btn_update, "#4caf50"))
+        self.btn_update.bind("<Enter>", lambda e: on_enter(self.btn_update, "#81c784")); self.btn_update.bind("<Leave>", lambda e: on_leave(self.btn_update, "#4caf50"))
         ToolTip(self.btn_update, "Проверить и установить обновления")
 
-        self.btn_about = tk.Button(btn_frame, text="ℹ️ О программе", command=self.show_about,
-                                   bg="#607d8b", fg="white", width=btn_width, font=("Segoe UI", 9, "bold"),
-                                   relief=tk.GROOVE, borderwidth=2, padx=5, pady=2)
+        self.btn_about = tk.Button(btn_frame, text="ℹ️ О программе", command=self.show_about, bg="#607d8b", fg="white", width=btn_width, font=("Segoe UI", 9, "bold"), relief=tk.GROOVE, borderwidth=2, padx=5, pady=2)
         self.btn_about.grid(row=0, column=4, padx=4, pady=5)
-        self.btn_about.bind("<Enter>", lambda e: on_enter(self.btn_about, "#90a4ae"))
-        self.btn_about.bind("<Leave>", lambda e: on_leave(self.btn_about, "#607d8b"))
+        self.btn_about.bind("<Enter>", lambda e: on_enter(self.btn_about, "#90a4ae")); self.btn_about.bind("<Leave>", lambda e: on_leave(self.btn_about, "#607d8b"))
         ToolTip(self.btn_about, "Информация о программе")
 
         keyboard.add_hotkey('F2', self.toggle_listening)
@@ -476,20 +387,12 @@ class GigaAMApp:
         keyboard.add_hotkey('F4', self.minimize_window)
 
     # ------------------------------------------------------------------
-    # Методы распознавания и обновления
+    # Методы
     # ------------------------------------------------------------------
     def compare_versions(self, v1, v2):
-        def normalize(v):
-            return [int(x) for x in v.split('.')]
-        try:
-            v1_parts = normalize(v1)
-            v2_parts = normalize(v2)
-        except:
-            return 0
-        for p1, p2 in zip(v1_parts, v2_parts):
-            if p1 > p2: return 1
-            if p1 < p2: return -1
-        return 0
+        def normalize(v): return [int(x) for x in v.split('.')]
+        try: return (normalize(v1) > normalize(v2)) - (normalize(v1) < normalize(v2))
+        except: return 0
 
     def download_and_install_update(self, download_url):
         try:
@@ -497,26 +400,20 @@ class GigaAMApp:
             response = requests.get(download_url, stream=True, timeout=30)
             response.raise_for_status()
             with tempfile.NamedTemporaryFile(delete=False, suffix=".pyw") as tmp_file:
-                for chunk in response.iter_content(chunk_size=8192):
-                    tmp_file.write(chunk)
+                for chunk in response.iter_content(chunk_size=8192): tmp_file.write(chunk)
                 tmp_path = tmp_file.name
             self.log(f"✅ Загружено: {os.path.basename(tmp_path)}")
-            if not messagebox.askyesno("Установка обновления",
-                                       "Новая версия загружена. Установить и перезапустить программу сейчас?"):
-                os.unlink(tmp_path)
-                return
+            if not messagebox.askyesno("Установка обновления", "Новая версия загружена. Установить и перезапустить программу сейчас?"):
+                os.unlink(tmp_path); return
             current_path = os.path.abspath(sys.argv[0])
             backup_path = current_path + ".backup"
-            if os.path.exists(backup_path):
-                os.remove(backup_path)
+            if os.path.exists(backup_path): os.remove(backup_path)
             os.rename(current_path, backup_path)
             shutil.copy2(tmp_path, current_path)
             os.unlink(tmp_path)
             self.log("✅ Обновление установлено. Перезапуск...")
             self.running = False
-            if hasattr(self, 'stream') and self.stream:
-                self.stream.stop()
-                self.stream.close()
+            if hasattr(self, 'stream') and self.stream: self.stream.stop(); self.stream.close()
             self.root.quit()
             subprocess.Popen([sys.executable, current_path], creationflags=subprocess.CREATE_NO_WINDOW)
             sys.exit(0)
@@ -537,24 +434,13 @@ class GigaAMApp:
                 assets = latest_release.get("assets", [])
                 download_url = None
                 for asset in assets:
-                    name = asset["name"]
-                    if name.endswith(".pyw") or ".pyw" in name:
-                        download_url = asset["browser_download_url"]
-                        break
+                    if asset["name"].endswith(".pyw") or ".pyw" in asset["name"]:
+                        download_url = asset["browser_download_url"]; break
                 if not download_url:
-                    if messagebox.askyesno(
-                        "Доступно обновление",
-                        f"Найдена новая версия: {latest_version}.\n"
-                        "Автоматическая установка невозможна (нет .pyw файла в релизе).\n"
-                        "Открыть страницу для ручного скачивания?"
-                    ):
+                    if messagebox.askyesno("Доступно обновление", f"Найдена новая версия: {latest_version}.\nАвтоматическая установка невозможна (нет .pyw файла в релизе).\nОткрыть страницу для ручного скачивания?"):
                         webbrowser.open(f"https://github.com/{GITHUB_REPO}/releases/latest")
                     return
-                if messagebox.askyesno(
-                    "Доступно обновление",
-                    f"Найдена новая версия: {latest_version}.\n"
-                    "Скачать и установить автоматически?"
-                ):
+                if messagebox.askyesno("Доступно обновление", f"Найдена новая версия: {latest_version}.\nСкачать и установить автоматически?"):
                     self.download_and_install_update(download_url)
             else:
                 messagebox.showinfo("Обновлений нет", "У вас установлена последняя версия.")
@@ -564,35 +450,23 @@ class GigaAMApp:
     def show_about(self):
         about_text = (
             f"GigaAM Complete v{CURRENT_VERSION}\n\n"
-            "Разработчик: Боярский Игорь Юрьевич\n"
-            "© 2026 Все права защищены.\n\n"
-            "• Распознавание GigaAM-v3\n"
-            "• Яндекс.Спеллер\n"
-            "• Автоустановка зависимостей\n"
-            "• Автоматическое обновление\n\n"
-            "Контакты:\n"
-            "📞 +7 905 570-28-04\n"
-            "✉️ boyarskiyiu@yandex.ru\n\n"
-            "Репозиторий:\n"
-            f"https://github.com/{GITHUB_REPO}"
+            "Разработчик: Боярский Игорь Юрьевич\n© 2026 Все права защищены.\n\n"
+            "• Распознавание GigaAM-v3\n• Яндекс.Спеллер\n• Автоустановка зависимостей\n• Автоматическое обновление\n\n"
+            "Контакты:\n📞 +7 905 570-28-04\n✉️ boyarskiyiu@yandex.ru\n\n"
+            f"Репозиторий:\nhttps://github.com/{GITHUB_REPO}"
         )
         messagebox.showinfo("О программе", about_text)
 
     def log(self, msg, append=False):
         ts = datetime.now().strftime("%H:%M:%S")
-        if not append:
-            self.log_text.insert(tk.END, f"[{ts}] {msg}\n")
-        else:
-            self.log_text.insert(tk.END, f"{msg}\n")
-        self.log_text.see(tk.END)
-        self.root.update_idletasks()
+        if not append: self.log_text.insert(tk.END, f"[{ts}] {msg}\n")
+        else: self.log_text.insert(tk.END, f"{msg}\n")
+        self.log_text.see(tk.END); self.root.update_idletasks()
 
     def set_status(self, text, color="#555"):
         self.status_label.config(text=text, fg=color)
-        if text == "Готов к работе":
-            self.ready_label.config(text="✅ Готов к работе", fg="#2e7d32")
-        else:
-            self.ready_label.config(text="")
+        if text == "Готов к работе": self.ready_label.config(text="✅ Готов к работе", fg="#2e7d32")
+        else: self.ready_label.config(text="")
 
     def toggle_listening(self):
         self.listening = not self.listening
@@ -607,13 +481,10 @@ class GigaAMApp:
             self.log("Пауза")
             self.ready_label.config(text="✅ Готов к работе", fg="#2e7d32")
 
-    def minimize_window(self):
-        self.root.iconify()
+    def minimize_window(self): self.root.iconify()
 
     def fix_last_phrase(self):
-        if not self.last_orig:
-            messagebox.showinfo("Исправление", "Нет фразы для исправления.")
-            return
+        if not self.last_orig: messagebox.showinfo("Исправление", "Нет фразы для исправления."); return
         dialog = tk.Toplevel(self.root)
         dialog.title("Исправление фразы")
         dialog.geometry("560x180")
@@ -630,52 +501,30 @@ class GigaAMApp:
         tk.Label(dialog, text="Правильный текст:", bg="#f0f0f0", font=("Segoe UI", 11)).pack()
         correct_entry = tk.Entry(dialog, width=50, font=("Segoe UI", 11))
         correct_entry.pack(pady=5)
-        btn_save = tk.Button(dialog, text="Сохранить", command=lambda: self._save_fix(dialog, correct_entry.get().strip()),
-                             bg="#4caf50", fg="white", width=17, font=("Segoe UI", 10, "bold"))
+        btn_save = tk.Button(dialog, text="Сохранить", command=lambda: self._save_fix(dialog, correct_entry.get().strip()), bg="#4caf50", fg="white", width=17, font=("Segoe UI", 10, "bold"))
         btn_save.pack(pady=10)
 
     def _save_fix(self, dialog, corr):
         if corr and corr != self.last_orig:
             data = {}
             if os.path.exists(self.corr_path):
-                with open(self.corr_path, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
+                with open(self.corr_path, 'r', encoding='utf-8') as f: data = json.load(f)
             data[self.last_orig] = corr
-            with open(self.corr_path, 'w', encoding='utf-8') as f:
-                json.dump(data, f, ensure_ascii=False, indent=2)
+            with open(self.corr_path, 'w', encoding='utf-8') as f: json.dump(data, f, ensure_ascii=False, indent=2)
             self.log(f"Исправление сохранено: '{self.last_orig}' → '{corr}'")
-            messagebox.showinfo("Успех", "Сохранено!")
-            dialog.destroy()
-        else:
-            messagebox.showwarning("Ошибка", "Введите корректный текст")
+            messagebox.showinfo("Успех", "Сохранено!"); dialog.destroy()
+        else: messagebox.showwarning("Ошибка", "Введите корректный текст")
 
     def on_close(self):
         if self._closing: return
         self._closing = True
-        self.btn_pause.config(state=tk.DISABLED)
-        self.btn_fix.config(state=tk.DISABLED)
-        self.btn_minimize.config(state=tk.DISABLED)
-        self.btn_update.config(state=tk.DISABLED)
-        self.btn_about.config(state=tk.DISABLED)
-        self.root.protocol("WM_DELETE_WINDOW", lambda: None)
         try:
             if messagebox.askyesno("Выход", "Завершить программу?"):
                 self.running = False
-                if hasattr(self, 'stream') and self.stream:
-                    self.stream.stop()
-                    self.stream.close()
+                if hasattr(self, 'stream') and self.stream: self.stream.stop(); self.stream.close()
                 self.root.quit()
                 self.root.destroy()
-                sys.exit(0)
-        finally:
-            if self.root.winfo_exists():
-                self.btn_pause.config(state=tk.NORMAL)
-                self.btn_fix.config(state=tk.NORMAL)
-                self.btn_minimize.config(state=tk.NORMAL)
-                self.btn_update.config(state=tk.NORMAL)
-                self.btn_about.config(state=tk.NORMAL)
-                self.root.after(100, lambda: self.root.protocol("WM_DELETE_WINDOW", self.on_close))
-            self._closing = False
+        except Exception: pass
 
     def init_background(self):
         self.log("="*50)
@@ -692,23 +541,15 @@ class GigaAMApp:
         except Exception as e:
             self.log(f"❌ Ошибка модели: {e}")
             self.root.after(0, lambda: messagebox.showerror("Ошибка", f"Не удалось загрузить модель:\n{e}"))
-            sys.exit(1)
+            self.set_status("Ошибка загрузки модели", "red")
+            return
 
         self.set_status("Поиск микрофона...")
-        self.device = get_best_mic()
-        if self.device is None:
-            self.log("❌ Микрофон не найден")
-            self.root.after(0, lambda: messagebox.showerror("Ошибка", "Микрофон не найден"))
-            sys.exit(1)
-        self.log(f"🎙️ Микрофон: {sd.query_devices(self.device)['name']}")
-
-        self.set_status("Калибровка шума...")
-        self.threshold = self.calibrate_threshold()
+        self.log("🎙️ Используется системный микрофон по умолчанию")
         self.log(f"🔊 Порог шума: {self.threshold}")
 
         if not os.path.exists(self.corr_path):
-            with open(self.corr_path, 'w') as f:
-                json.dump({}, f)
+            with open(self.corr_path, 'w') as f: json.dump({}, f)
             self.log("✅ corrections.json создан")
 
         self.set_status("Готов к работе", "#2e7d32")
@@ -716,39 +557,22 @@ class GigaAMApp:
         self.start_stream()
         self.root.after(0, lambda: self.toggle_listening())
 
-    def calibrate_threshold(self):
-        try:
-            rec = sd.rec(int(2 * self.rate), samplerate=self.rate, channels=1, dtype='int16', device=self.device)
-            sd.wait()
-            noise = np.max(np.abs(rec))
-            noise = min(noise, 32767)
-            threshold = max(noise + 20, 160)
-            return min(threshold, 800)
-        except:
-            return 300
-
     def start_stream(self):
-        self.stream = sd.InputStream(device=self.device, samplerate=self.rate, channels=1,
-                                     dtype='int16', blocksize=self.blocksize, callback=self.audio_callback)
+        self.stream = sd.InputStream(device=self.device, samplerate=self.rate, channels=1, dtype='int16', blocksize=self.blocksize, callback=self.audio_callback)
         self.stream.start()
         self.log("🎙️ Аудиопоток запущен")
 
     def update_volume_color(self, value):
-        if value < 40:
-            self.volume_indicator.configure(style="green.Horizontal.TProgressbar")
-        elif value < 70:
-            self.volume_indicator.configure(style="orange.Horizontal.TProgressbar")
-        else:
-            self.volume_indicator.configure(style="red.Horizontal.TProgressbar")
+        if value < 40: self.volume_indicator.configure(style="green.Horizontal.TProgressbar")
+        elif value < 70: self.volume_indicator.configure(style="orange.Horizontal.TProgressbar")
+        else: self.volume_indicator.configure(style="red.Horizontal.TProgressbar")
         self.volume_indicator.configure(value=value)
         self.volume_label.config(text=f"{int(value)}%")
 
     def audio_callback(self, indata, frames, time_info, status):
         vol = np.max(np.abs(indata))
-        if vol <= 0:
-            norm_vol = 0
-        else:
-            norm_vol = min(100, int(np.log10(vol / 100 + 1) * 40))
+        if vol <= 0: norm_vol = 0
+        else: norm_vol = min(100, int(np.log10(vol / 100 + 1) * 40))
         self.volume_history.append(norm_vol)
         smoothed_vol = sum(self.volume_history) / len(self.volume_history)
         self.root.after(0, lambda: self.update_volume_color(smoothed_vol))
@@ -762,8 +586,7 @@ class GigaAMApp:
             self.pre_buffer = []
             return
         self.pre_buffer.append(indata.copy())
-        if len(self.pre_buffer) > self.pre_max:
-            self.pre_buffer.pop(0)
+        if len(self.pre_buffer) > self.pre_max: self.pre_buffer.pop(0)
 
         frames_per_sec = self.rate / self.blocksize
         silence_needed = int(self.silence_dur * frames_per_sec)
@@ -791,14 +614,12 @@ class GigaAMApp:
                         self.recording = False
                         if self.current_rec:
                             dur = time.time() - self.record_start
-                            if dur >= 0.5 and self.speech_counter >= self.min_speech_frames:
+                            if dur >= 0.8 and self.speech_counter >= self.min_speech_frames:
                                 self.log("⏹️ Отправка фрагмента...")
                                 self.root.after(0, lambda: self.set_status("⏳ Распознаю...", "#e67e22"))
                                 audio = np.concatenate(self.current_rec, axis=0)
-                                try:
-                                    self.task_queue.put(audio, block=False)
-                                except queue.Full:
-                                    self.log("⚠️ Очередь переполнена")
+                                try: self.task_queue.put(audio, block=False)
+                                except queue.Full: self.log("⚠️ Очередь переполнена")
                             else:
                                 self.log("⏹️ Шум (отброшено)", append=True)
                         self.current_rec = []
@@ -806,20 +627,21 @@ class GigaAMApp:
                         self.end_wait_frames = 0
                         self.speech_counter = 0
             else:
-                if self.speech_counter > 0:
-                    self.speech_counter -= 1
+                if self.speech_counter > 0: self.speech_counter -= 1
                 self.silent_frames = 0
 
     def _recognize_and_paste(self, audio):
+        if self.model is None:
+            self.log("⚠️ Модель не загружена")
+            self.root.after(0, lambda: self.set_status("Ошибка модели", "red"))
+            return
         try:
             with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
                 write_wav(f.name, self.rate, audio.astype(np.int16))
                 f.flush()
                 raw = self.model.recognize(f.name).strip()
-                try:
-                    os.unlink(f.name)
-                except:
-                    pass
+                try: os.unlink(f.name)
+                except: pass
             if raw:
                 self.log(f"📝 Распознано: '{raw}'")
                 orig = raw.strip()
@@ -828,41 +650,50 @@ class GigaAMApp:
                 if os.path.exists(self.corr_path):
                     with open(self.corr_path, 'r', encoding='utf-8') as cf:
                         corr = json.load(cf)
-                    for wrong, right in corr.items():
-                        text = text.replace(wrong, right)
+                    for wrong, right in corr.items(): text = text.replace(wrong, right)
                 text = clean_text(text)
                 text = remove_leading_punctuation(text)
                 text = re.sub(r'\s+', ' ', text).strip()
                 text = normalize_punctuation(text)
-                if text:
-                    text = text[0].upper() + text[1:]
-                # УЛУЧШЕННЫЙ ЯНДЕКС.СПЕЛЛЕР
-                if self.speller and text and len(text) > 3:
-                    try:
-                        # Повторная инициализация при необходимости
-                        if not hasattr(self.speller, 'spelled'):
-                            self.speller = YandexSpeller(
-                                lang='ru', find_repeat_words=True,
-                                ignore_urls=True, ignore_digits=True,
-                                ignore_capitalization=True, check_yo=False
-                            )
-                        text = self.speller.spelled(text)
-                        self.log(f"🪄 После спеллера: '{text}'")
-                    except Exception as e:
-                        self.log(f"⚠️ Ошибка спеллера: {e}")
-                if text and text != self.last_final and len(text) > 1:
-                    elapsed = time.time() - self.record_start
-                    self.log(f"✅ {elapsed:.1f} сек: {text}")
-                    self.paste(text)
-                    self.last_final = text
-                    self.root.after(0, lambda: self.update_phrase(text))
-                else:
-                    self.log("⚠️ Повтор или пусто")
+                if text: text = text[0].upper() + text[1:]
+
+                def apply_speller():
+                    nonlocal text
+                    if self.speller and len(text) > 3:
+                        try:
+                            if not hasattr(self.speller, 'spelled'):
+                                self.speller = YandexSpeller(lang='ru', find_repeat_words=True, ignore_urls=True, ignore_digits=True, ignore_capitalization=True, check_yo=False)
+                            text = self.speller.spelled(text)
+                            self.log(f"🪄 После спеллера: '{text}'")
+                        except Exception as e:
+                            self.log(f"⚠️ Ошибка спеллера: {e}")
+                    if text and text != self.last_final and len(text) > 1:
+                        elapsed = time.time() - self.record_start
+                        self.log(f"✅ {elapsed:.1f} сек: {text}")
+                        self.paste(text)
+                        self.last_final = text
+                        self.root.after(0, lambda: self.update_phrase(text))
+                    else:
+                        self.log("⚠️ Повтор или пусто")
+                    self.root.after(0, lambda: self.set_status("Готов к работе", "#2e7d32"))
+
+                spell_thread = threading.Thread(target=apply_speller, daemon=True)
+                spell_thread.start()
+                spell_thread.join(timeout=2.0)
+                if spell_thread.is_alive():
+                    self.log("⚠️ Спеллер не ответил за 2 сек, вставляем без проверки")
+                    if text and text != self.last_final and len(text) > 1:
+                        elapsed = time.time() - self.record_start
+                        self.log(f"✅ {elapsed:.1f} сек: {text}")
+                        self.paste(text)
+                        self.last_final = text
+                        self.root.after(0, lambda: self.update_phrase(text))
+                    self.root.after(0, lambda: self.set_status("Готов к работе", "#2e7d32"))
             else:
                 self.log("⚠️ Не распознано")
+                self.root.after(0, lambda: self.set_status("Готов к работе", "#2e7d32"))
         except Exception as e:
             self.log(f"❌ Ошибка: {e}")
-        finally:
             self.root.after(0, lambda: self.set_status("Готов к работе", "#2e7d32"))
 
     def update_phrase(self, text):
@@ -892,8 +723,7 @@ def main():
     try:
         from ctypes import windll
         windll.dwmapi.DwmSetWindowAttribute(windll.user32.GetParent(root.winfo_id()), 33, 2, 4)
-    except:
-        pass
+    except: pass
     app = GigaAMApp(root)
     root.mainloop()
 
